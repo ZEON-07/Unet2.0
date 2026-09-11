@@ -80,3 +80,45 @@ VALUES
    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   ('01919000-0000-7000-8000-000000000022', 'online',  'BIC Official',   'https://www.bicworld.com', 'FR', 1,
    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+-- ─── Pen Claims ───────────────────────────────────────────────────────────────
+
+INSERT OR IGNORE INTO pen_claims (
+  id, user_id, pen_model_id, source_id,
+  mileage_claimed, is_verified, notes,
+  created_at, updated_at
+)
+VALUES
+  (
+    '01919000-0000-7000-8000-000000000030',
+    '00000000-0000-0000-0000-000000000001',
+    '01919000-0000-7000-8000-000000000010',
+    '01919000-0000-7000-8000-000000000022',
+    3000.0,
+    1,
+    'Manufacturer certified writing distance of 3 km under standard testing.',
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  ),
+  (
+    '01919000-0000-7000-8000-000000000031',
+    '00000000-0000-0000-0000-000000000001',
+    '01919000-0000-7000-8000-000000000011',
+    '01919000-0000-7000-8000-000000000020',
+    10000.0,
+    1,
+    'Manufacturer certified 10,000 meters continuous write-out length.',
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  ),
+  (
+    '01919000-0000-7000-8000-000000000032',
+    '00000000-0000-0000-0000-000000000001',
+    '01919000-0000-7000-8000-000000000012',
+    '01919000-0000-7000-8000-000000000020',
+    1500.0,
+    1,
+    'Manufacturer certified 1,500 meters writing length for low-viscosity ink.',
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+  );

@@ -13,8 +13,9 @@
     "db:seed:local": "wrangler d1 execute inklife-db --local --file=drizzle/seed.sql",
     "db:seed:remote": "wrangler d1 execute inklife-db --remote --file=drizzle/seed.sql",
     "db:studio": "drizzle-kit studio",
-    "test": "tsx src/tests/prediction.engine.test.ts",
+    "test": "tsx src/tests/prediction.engine.test.ts && tsx src/tests/claim.extractor.test.ts",
     "test:watch": "tsx watch src/tests/prediction.engine.test.ts",
+    "test:e2e": "tsx src/tests/e2e.verify.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {

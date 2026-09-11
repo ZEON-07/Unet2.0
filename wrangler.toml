@@ -22,6 +22,12 @@ binding = "RATE_LIMIT_KV"
 id = "local"                   # Replace with real ID after: wrangler kv namespace create RATE_LIMIT_KV
 preview_id = "local"
 
+# ─── KV Namespace (search cache, 30-day TTL) ───────────────────────────────────
+[[kv_namespaces]]
+binding = "SEARCH_CACHE_KV"
+id = "local"                   # Replace with real ID after: wrangler kv namespace create SEARCH_CACHE_KV
+preview_id = "local"
+
 # ─── Local dev overrides ───────────────────────────────────────────────────────
 [dev]
 port = 8787

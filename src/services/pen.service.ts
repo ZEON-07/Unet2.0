@@ -7,7 +7,7 @@
 import type { DrizzleDb } from "../repositories/db";
 import * as penRepo from "../repositories/pen.repository";
 import * as brandRepo from "../repositories/brand.repository";
-import type { PenModelRow, PredictionRow } from "../repositories/pen.repository";
+import type { PenClaimInfo, PenModelRow, PredictionRow } from "../repositories/pen.repository";
 import { NotFoundError } from "../utils/errors";
 import type { PenSearchQuery } from "../validators/pen.validators";
 
@@ -44,6 +44,7 @@ export type PenModelDetailDto = PenModelSummaryDto & {
   communityMileageM: number | null;
   imageUrl: string | null;
   description: string | null;
+  claims: PenClaimInfo[];
   createdAt: string;
   updatedAt: string;
 };
@@ -91,13 +92,15 @@ function mapPenSummary(
 
 function mapPenDetail(
   row: PenModelRow,
-  claimSummary: ClaimSummaryDto
+  claimSummary: ClaimSummaryDto,
+  claims: PenClaimInfo[] = []
 ): PenModelDetailDto {
   return {
     ...mapPenSummary(row, claimSummary),
     communityMileageM: row.communityMileageM,
     imageUrl: row.imageUrl,
     description: row.description,
+    claims,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -172,6 +175,10 @@ export async function getPenDetail(
   const row = await penRepo.findPenByIdOrSlug(db, idOrSlug);
   if (!row) throw new NotFoundError("PenModel", idOrSlug);
 
-  const pred = await penRepo.findLatestPrediction(db, row.id);
-  return mapPenDetail(row, mapClaimSummary(pred));
+  const [pred, claims] = await Promise.all([
+    penRepo.findLatestPrediction(db, row.id),
+    penRepo.findClaimsForPenModel(db, row.id),
+  ]);
+
+  return mapPenDetail(row, mapClaimSummary(pred), claims);
 }

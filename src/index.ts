@@ -26,6 +26,7 @@ import { pensRoute } from "./routes/pens";
 import { predictionsRoute } from "./routes/predictions";
 import { authRoute } from "./routes/auth";
 import { adminRoute } from "./routes/admin";
+import { searchLookupsRoute } from "./routes/searchLookups";
 import type { HonoEnv } from "./types/bindings";
 
 const app = new Hono<HonoEnv>({ strict: false });
@@ -42,6 +43,7 @@ app.use("*", rateLimitMiddleware());
 
 app.route("/api/health", healthRoute);
 app.route("/api/docs", docsRoute);
+app.get("/openapi.json", (c) => c.redirect("/api/docs/openapi.json"));
 
 // ─── Phase 1: Public Read APIs ────────────────────────────────────────────────
 app.route("/api/brands", brandsRoute);
@@ -53,6 +55,9 @@ app.route("/api/predictions", predictionsRoute);
 // ─── Phase 3: Auth + Admin ────────────────────────────────────────────────────
 app.route("/api/auth", authRoute);
 app.route("/api/admin", adminRoute);
+
+// ─── Phase 4: Web-Search Lookup Pipeline ───────────────────────────────────────
+app.route("/api/search-lookups", searchLookupsRoute);
 
 // ─── 404 fallback ─────────────────────────────────────────────────────────────
 

@@ -1,13 +1,35 @@
-# Copy this file to .dev.vars and fill in real values.
+# =============================================================================
+# InkLife API – Local Development Environment Variables
+# =============================================================================
+# Copy this file to .dev.vars for local development:
+#   cp .dev.vars.example .dev.vars
+#
 # .dev.vars is loaded automatically by `wrangler dev` and is GITIGNORED.
-# For production, set secrets with: wrangler secret put <KEY>
+# NEVER commit real secret values to version control.
+#
+# For production Cloudflare Workers deployment, set secrets using:
+#   wrangler secret put JWT_SECRET
+#   wrangler secret put TAVILY_API_KEY
+# =============================================================================
 
-# Required: strong random secret for JWT signing
-# Generate with: openssl rand -base64 64
-JWT_SECRET=
+# ─── Authentication Secrets ───────────────────────────────────────────────────
+# Required: Cryptographically strong secret key used for signing and verifying JWTs.
+# Must be at least 16 characters long.
+# Generate a secure key with: openssl rand -base64 48
+JWT_SECRET=your-super-secret-jwt-key-min-16-chars-long
 
-# Comma-separated admin email addresses
+# ─── Access Control ───────────────────────────────────────────────────────────
+# Comma-separated list of email addresses granted the "admin" role on registration/login.
 ADMIN_EMAILS=admin@example.com
 
-# Allowed CORS origin (default: http://localhost:3000)
+# ─── Cross-Origin Resource Sharing (CORS) ────────────────────────────────────
+# The frontend URL permitted to make browser-based fetch calls.
+# Default: http://localhost:3000 (standard React / Next.js / Vite dev server)
 CORS_ORIGIN=http://localhost:3000
+
+# ─── Web Search Pipeline (Phase 4) ────────────────────────────────────────────
+# Optional: API key for Tavily AI Search (https://tavily.com).
+# Used by POST /api/search-lookups to find manufacturer writing-length claims online.
+# If left empty, the pipeline automatically falls back to an internal StubProvider
+# allowing full local testing without incurring external API credits.
+TAVILY_API_KEY=

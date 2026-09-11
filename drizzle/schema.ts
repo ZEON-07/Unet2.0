@@ -156,7 +156,7 @@ export const penClaims = sqliteTable(
     purchasedAt: text("purchased_at"),
     /** User-reported mileage in metres */
     mileageClaimed: real("mileage_claimed"),
-    /** 1–5 subjective ink-flow quality rating */
+    /** 1-5 subjective ink-flow quality rating */
     inkFlowRating: integer("ink_flow_rating"),
     notes: text("notes"),
     isVerified: integer("is_verified", { mode: "boolean" })
@@ -193,7 +193,7 @@ export const predictions = sqliteTable(
     modelVersion: text("model_version").notNull(),
     /** Number of community claims used (0 for manufacturer-only estimates) */
     sampleSize: integer("sample_size").notNull().default(0),
-    /** Full serialised prediction request + result DTO (JSON) – used by GET /api/predictions/:id */
+    /** Full serialised prediction request + result DTO (JSON) */
     resultJson: text("result_json"),
     /** Additional model metadata as JSON string */
     metadata: text("metadata"),
@@ -206,7 +206,6 @@ export const predictions = sqliteTable(
   })
 );
 
-
 // ─── SearchLookup ─────────────────────────────────────────────────────────────
 
 export const searchLookups = sqliteTable(
@@ -214,7 +213,7 @@ export const searchLookups = sqliteTable(
   {
     id: text("id").primaryKey(),
     query: text("query").notNull(),
-    /** Matched pen model (null = no match) */
+    /** Matched pen model (null = no match found) */
     penModelId: text("pen_model_id").references(() => penModels.id, {
       onDelete: "set null",
     }),
@@ -222,11 +221,29 @@ export const searchLookups = sqliteTable(
     /** Client IP hash (not raw IP, for privacy) */
     clientIpHash: text("client_ip_hash"),
     searchedAt: text("searched_at").notNull().default(now),
+    // Phase 4 pipeline fields
+    /** Pipeline status */
+    status: text("status", { enum: ["pending", "completed", "failed", "cached"] })
+      .notNull()
+      .default("completed"),
+    /** Raw JSON from the search provider – stored for auditing */
+    rawResult: text("raw_result"),
+    /** Number of pending PenClaim rows created from this lookup */
+    pendingClaimsCreated: integer("pending_claims_created").notNull().default(0),
+    /** Structured brand input (null for free-text queries) */
+    brand: text("brand"),
+    /** Structured model input (null for free-text queries) */
+    model: text("model"),
+    /** True when result was served from KV cache */
+    cacheHit: integer("cache_hit", { mode: "boolean" }).notNull().default(false),
+    /** Human-readable summary returned to the caller */
+    message: text("message"),
   },
   (t) => ({
     queryIdx: index("search_lookups_query_idx").on(t.query),
     modelIdx: index("search_lookups_model_idx").on(t.penModelId),
     searchedAtIdx: index("search_lookups_searched_at_idx").on(t.searchedAt),
+    statusIdx: index("search_lookups_status_idx").on(t.status),
   })
 );
 

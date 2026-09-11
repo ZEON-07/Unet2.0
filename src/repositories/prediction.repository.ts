@@ -45,7 +45,7 @@ export async function findSourceForPenModel(
     .from(penClaims)
     .innerJoin(penSources, eq(penClaims.sourceId, penSources.id))
     .where(eq(penClaims.penModelId, penModelId))
-    .orderBy(desc(penClaims.createdAt))
+    .orderBy(desc(penClaims.isVerified), desc(penClaims.createdAt))
     .get();
 
   return row ?? null;

@@ -8,9 +8,9 @@
  *  - LIMIT/OFFSET for pagination
  */
 
-import { and, asc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import type { DrizzleDb } from "./db";
-import { penBrands, penModels, predictions } from "../../drizzle/schema";
+import { penBrands, penClaims, penModels, penSources, predictions } from "../../drizzle/schema";
 import type { PenSearchQuery } from "../validators/pen.validators";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -187,3 +187,59 @@ export async function findLatestPrediction(
     .orderBy(sql`${predictions.computedAt} DESC`)
     .get() as unknown as PredictionRow | undefined;
 }
+
+/**
+ * Find a pen model by brand ID and a fuzzy model name match.
+ * Used by the Phase 4 search pipeline to link extracted claims.
+ */
+export async function findPenByBrandAndName(
+  db: DrizzleDb,
+  brandId: string,
+  modelName: string
+) {
+  return db
+    .select({ id: penModels.id, name: penModels.name, slug: penModels.slug })
+    .from(penModels)
+    .where(
+      and(
+        eq(penModels.brandId, brandId),
+        like(penModels.name, `%${modelName}%`)
+      )
+    )
+    .get();
+}
+
+export type PenClaimInfo = {
+  id: string;
+  sourceName: string;
+  sourceUrl: string | null;
+  mileageClaimed: number;
+  isVerified: boolean;
+  notes: string | null;
+  createdAt: string;
+};
+
+/**
+ * Fetch all claims associated with a pen model, ordered by verified status then recency.
+ */
+export async function findClaimsForPenModel(
+  db: DrizzleDb,
+  penModelId: string
+): Promise<PenClaimInfo[]> {
+  return db
+    .select({
+      id: penClaims.id,
+      sourceName: penSources.name,
+      sourceUrl: penSources.url,
+      mileageClaimed: penClaims.mileageClaimed,
+      isVerified: penClaims.isVerified,
+      notes: penClaims.notes,
+      createdAt: penClaims.createdAt,
+    })
+    .from(penClaims)
+    .innerJoin(penSources, eq(penClaims.sourceId, penSources.id))
+    .where(eq(penClaims.penModelId, penModelId))
+    .orderBy(desc(penClaims.isVerified), desc(penClaims.createdAt))
+    .all() as unknown as PenClaimInfo[];
+}
+

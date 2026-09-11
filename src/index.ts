@@ -21,6 +21,8 @@ import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { errorHandler } from "./middleware/errorHandler";
 import { healthRoute } from "./routes/health";
 import { docsRoute } from "./routes/docs";
+import { brandsRoute } from "./routes/brands";
+import { pensRoute } from "./routes/pens";
 import type { HonoEnv } from "./types/bindings";
 
 const app = new Hono<HonoEnv>({ strict: false });
@@ -37,6 +39,10 @@ app.use("*", rateLimitMiddleware());
 
 app.route("/api/health", healthRoute);
 app.route("/api/docs", docsRoute);
+
+// ─── Phase 1: Public Read APIs ────────────────────────────────────────────────
+app.route("/api/brands", brandsRoute);
+app.route("/api/pens", pensRoute);
 
 // ─── 404 fallback ─────────────────────────────────────────────────────────────
 

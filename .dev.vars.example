@@ -1,0 +1,13 @@
+# Copy this file to .dev.vars and fill in real values.
+# .dev.vars is loaded automatically by `wrangler dev` and is GITIGNORED.
+# For production, set secrets with: wrangler secret put <KEY>
+
+# Required: strong random secret for JWT signing
+# Generate with: openssl rand -base64 64
+JWT_SECRET=
+
+# Comma-separated admin email addresses
+ADMIN_EMAILS=admin@example.com
+
+# Allowed CORS origin (default: http://localhost:3000)
+CORS_ORIGIN=http://localhost:3000

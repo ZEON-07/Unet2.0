@@ -13,6 +13,7 @@ export interface RefillModelProps {
   highlightMeniscus?: boolean;
   showSliderTooltip?: boolean;
   colorOverride?: string;
+  isDarkAnalysisMode?: boolean;
 }
 
 export function RefillModel({
@@ -23,24 +24,27 @@ export function RefillModel({
   highlightMeniscus = false,
   showSliderTooltip = true,
   colorOverride,
+  isDarkAnalysisMode = false,
 }: RefillModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const clamp = Math.max(0, Math.min(100, inkPercentage));
 
-  // Dynamic ink fluid color based on remaining volume
+  // Dynamic ink fluid color based on remaining volume and active mode
   const inkColor = useMemo(() => {
     if (colorOverride) return colorOverride;
-    if (clamp > 60) return "#2563EB"; // Royal blue
-    if (clamp > 30) return "#0D9488"; // Teal / emerald
-    if (clamp > 10) return "#F59E0B"; // Warning amber
-    return "#EF4444"; // Critical red
-  }, [clamp, colorOverride]);
+    if (isDarkAnalysisMode) {
+      return "#4D78FF"; // Radiant electric cyan-blue in dark UV analysis mode
+    }
+    if (clamp > 60) return "#225CFF"; // Deep electric blue
+    if (clamp > 30) return "#0284C7"; // Laboratory cobalt
+    if (clamp > 10) return "#EA580C"; // Warning amber
+    return "#DC2626"; // Critical low ink
+  }, [clamp, colorOverride, isDarkAnalysisMode]);
 
   // Geometry dimensions
   // Tube spans from baseY = -1.0 up to 2.0 (total tube length = 3.0)
   const baseY = -1.0;
   const travelHeight = 2.7;
-  // If clamp is 0, keep a micro trace near the tip (~0.04) as requested
   const inkHeight = Math.max(0.04, (clamp / 100) * travelHeight);
   const inkTopY = baseY + inkHeight;
   const inkCenterY = baseY + inkHeight / 2;
@@ -92,18 +96,33 @@ export function RefillModel({
       <mesh name="Refill_Barrel" position={[0, 0.5, 0]}>
         <cylinderGeometry args={[0.165, 0.165, 3.0, 32]} />
         <meshPhysicalMaterial
-          color="#F0F8FF"
-          transmission={0.93}
-          roughness={0.06}
+          color={isDarkAnalysisMode ? "#0F172A" : "#F8FAFC"}
+          transmission={isDarkAnalysisMode ? 0.82 : 0.94}
+          roughness={isDarkAnalysisMode ? 0.12 : 0.05}
           thickness={0.25}
           transparent
-          opacity={0.62}
+          opacity={isDarkAnalysisMode ? 0.45 : 0.65}
           clearcoat={1.0}
           clearcoatRoughness={0.05}
           reflectivity={0.65}
           ior={1.46}
+          emissive={isDarkAnalysisMode ? "#2563EB" : "#000000"}
+          emissiveIntensity={isDarkAnalysisMode ? 0.18 : 0}
         />
       </mesh>
+
+      {/* Blueprint wireframe cage in dark analysis mode */}
+      {isDarkAnalysisMode && (
+        <mesh position={[0, 0.5, 0]}>
+          <cylinderGeometry args={[0.166, 0.166, 3.01, 16, 8, true]} />
+          <meshBasicMaterial
+            wireframe
+            color="#4D78FF"
+            transparent
+            opacity={0.22}
+          />
+        </mesh>
+      )}
 
       {/* ── Etched calibration gauge rings on tube ── */}
       {ticks.map((t) => {
@@ -113,14 +132,26 @@ export function RefillModel({
             <mesh>
               <torusGeometry args={[0.166, 0.0035, 12, 48]} />
               <meshStandardMaterial
-                color={t === 0 || t === 100 ? "#0D1B2A" : "#64748B"}
+                color={
+                  isDarkAnalysisMode
+                    ? "#62DDD1"
+                    : t === 0 || t === 100
+                    ? "#0B0F14"
+                    : "#64748B"
+                }
                 roughness={0.4}
                 metalness={0.6}
+                emissive={isDarkAnalysisMode ? "#62DDD1" : "#000000"}
+                emissiveIntensity={isDarkAnalysisMode ? 0.4 : 0}
               />
             </mesh>
             <mesh position={[-0.18, 0, 0]}>
               <boxGeometry args={[0.035, 0.012, 0.012]} />
-              <meshStandardMaterial color="#64748B" roughness={0.3} metalness={0.8} />
+              <meshStandardMaterial
+                color={isDarkAnalysisMode ? "#62DDD1" : "#0B0F14"}
+                roughness={0.3}
+                metalness={0.8}
+              />
             </mesh>
           </group>
         );
@@ -133,11 +164,17 @@ export function RefillModel({
           color={inkColor}
           roughness={0.12}
           metalness={0.04}
-          transmission={0.18}
+          transmission={isDarkAnalysisMode ? 0.1 : 0.18}
           transparent
-          opacity={0.94}
+          opacity={0.95}
           emissive={inkColor}
-          emissiveIntensity={highlightMeniscus ? 0.45 : 0.22}
+          emissiveIntensity={
+            isDarkAnalysisMode
+              ? 0.85
+              : highlightMeniscus
+              ? 0.45
+              : 0.22
+          }
           clearcoat={0.6}
         />
       </mesh>
@@ -149,7 +186,9 @@ export function RefillModel({
           color={inkColor}
           roughness={0.05}
           emissive={inkColor}
-          emissiveIntensity={highlightMeniscus ? 0.8 : 0.4}
+          emissiveIntensity={
+            isDarkAnalysisMode ? 0.95 : highlightMeniscus ? 0.8 : 0.4
+          }
         />
       </mesh>
 
@@ -158,36 +197,34 @@ export function RefillModel({
         <mesh position={[0, followerCenterY, 0]}>
           <cylinderGeometry args={[0.144, 0.144, followerHeight, 32]} />
           <meshPhysicalMaterial
-            color="#FEF3C7"
+            color={isDarkAnalysisMode ? "#62DDD1" : "#FEF3C7"}
             roughness={0.18}
             metalness={0.02}
             transmission={0.85}
             thickness={0.4}
             transparent
-            opacity={0.6}
+            opacity={isDarkAnalysisMode ? 0.35 : 0.6}
             clearcoat={0.7}
+            emissive={isDarkAnalysisMode ? "#62DDD1" : "#000000"}
+            emissiveIntensity={isDarkAnalysisMode ? 0.25 : 0}
           />
         </mesh>
       )}
 
       {/* ── 4. Rear_Plug (Named rear end stopper at top opening) ── */}
       <group name="Rear_Plug" position={[0, 2.0, 0]}>
-        {/* Inserted stopper neck */}
         <mesh position={[0, -0.05, 0]}>
           <cylinderGeometry args={[0.142, 0.142, 0.2, 32]} />
           <meshStandardMaterial color="#1E293B" roughness={0.4} metalness={0.3} />
         </mesh>
-        {/* Outer flange lip */}
         <mesh position={[0, 0.06, 0]}>
           <cylinderGeometry args={[0.18, 0.18, 0.08, 32]} />
           <meshStandardMaterial color={inkColor} roughness={0.35} metalness={0.3} />
         </mesh>
-        {/* Air breather channel fin with central injection opening */}
         <mesh position={[0, 0.14, 0]}>
           <cylinderGeometry args={[0.13, 0.13, 0.1, 32]} />
           <meshStandardMaterial color="#0F172A" roughness={0.5} metalness={0.3} />
         </mesh>
-        {/* Central opening ring where nozzle docks */}
         <mesh position={[0, 0.2, 0]}>
           <torusGeometry args={[0.06, 0.015, 16, 32]} />
           <meshStandardMaterial color="#334155" roughness={0.2} metalness={0.8} />
@@ -196,37 +233,31 @@ export function RefillModel({
 
       {/* ── 5. Metal_Tip (Named front stainless steel + rollerball tip) ── */}
       <group name="Metal_Tip" position={[0, 0, 0]}>
-        {/* Crimp collar holding into tube */}
         <mesh position={[0, -1.08, 0]}>
           <cylinderGeometry args={[0.168, 0.158, 0.18, 32]} />
           <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.92} />
         </mesh>
-        {/* Brass shoulder ring */}
         <mesh position={[0, -1.18, 0]}>
           <cylinderGeometry args={[0.172, 0.172, 0.05, 32]} />
           <meshStandardMaterial color="#D4AF37" roughness={0.25} metalness={0.9} />
         </mesh>
-        {/* Stainless steel neck pipe */}
         <mesh position={[0, -1.38, 0]}>
           <cylinderGeometry args={[0.075, 0.075, 0.38, 32]} />
           <meshStandardMaterial color="#E2E8F0" roughness={0.15} metalness={0.95} />
         </mesh>
-        {/* Machined precision writing cone tip */}
         <mesh position={[0, -1.66, 0]}>
           <coneGeometry args={[0.072, 0.3, 32]} />
           <meshStandardMaterial color="#CBD5E1" roughness={0.2} metalness={0.92} />
         </mesh>
-        {/* Tungsten carbide rollerball socket & ball */}
         <mesh position={[0, -1.82, 0]}>
           <sphereGeometry args={[0.02, 16, 16]} />
           <meshStandardMaterial
             color={inkColor}
             roughness={0.1}
             emissive={inkColor}
-            emissiveIntensity={0.6}
+            emissiveIntensity={isDarkAnalysisMode ? 0.9 : 0.6}
           />
         </mesh>
-        {/* Droplet bead at tip when ink is low */}
         {clamp < 20 && clamp > 0 && (
           <mesh position={[0, -1.89, 0]}>
             <sphereGeometry args={[0.032, 16, 16]} />
@@ -235,7 +266,7 @@ export function RefillModel({
               transparent
               opacity={0.88}
               emissive={inkColor}
-              emissiveIntensity={0.5}
+              emissiveIntensity={isDarkAnalysisMode ? 0.8 : 0.5}
             />
           </mesh>
         )}
@@ -244,42 +275,39 @@ export function RefillModel({
       {/* ── Optional Interactive Slider Collar on Meniscus ── */}
       {interactiveSlider && (
         <group position={[0, inkTopY, 0]}>
-          {/* Chrome precision collar ring */}
           <mesh>
             <cylinderGeometry args={[0.218, 0.218, 0.07, 32]} />
-            <meshStandardMaterial color="#F8FAFC" roughness={0.15} metalness={0.95} />
+            <meshStandardMaterial
+              color={isDarkAnalysisMode ? "#4D78FF" : "#F8FAFC"}
+              roughness={0.15}
+              metalness={0.95}
+              emissive={isDarkAnalysisMode ? "#4D78FF" : "#000000"}
+              emissiveIntensity={isDarkAnalysisMode ? 0.3 : 0}
+            />
           </mesh>
-          {/* Glowing color indicator strip */}
           <mesh>
             <cylinderGeometry args={[0.22, 0.22, 0.025, 32]} />
             <meshStandardMaterial
               color={inkColor}
               roughness={0.2}
               emissive={inkColor}
-              emissiveIntensity={0.7}
+              emissiveIntensity={0.8}
             />
           </mesh>
-          {/* Side tabs */}
-          {[-0.23, 0.23].map((x, i) => (
-            <mesh key={i} position={[x, 0, 0]}>
-              <boxGeometry args={[0.045, 0.055, 0.045]} />
-              <meshStandardMaterial color="#CBD5E1" roughness={0.3} metalness={0.8} />
-            </mesh>
-          ))}
 
-          {/* Floating readout tag */}
+          {/* Technical Laboratory Readout Tag */}
           {showSliderTooltip && (
             <Html position={[0.42, 0, 0]} center pointerEvents="none">
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-xl border bg-ink-navy/90 text-white border-white/20 backdrop-blur-md select-none whitespace-nowrap">
-                <span className="text-[11px] text-ink-mint font-bold">↕</span>
-                <span>{Math.round(clamp)}%</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-mono font-bold tracking-wider uppercase border border-[var(--line)] bg-[var(--surface)] text-[var(--foreground)] shadow-md select-none whitespace-nowrap">
+                <span className="text-[var(--ink-blue)]">↕</span>
+                <span>SAMPLE: {Math.round(clamp)}%</span>
               </div>
             </Html>
           )}
         </group>
       )}
 
-      {/* ── Hit-box cylinder for fluid click & drag ── */}
+      {/* ── Hit-box cylinder for smooth vertical drag ── */}
       {interactiveSlider && (
         <mesh
           position={[0, 0.45, 0]}

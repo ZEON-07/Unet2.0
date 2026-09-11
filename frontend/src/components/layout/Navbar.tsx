@@ -1,150 +1,146 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { PenLine, Menu, X } from "lucide-react";
-
-const NAV_LINKS = [
-  { label: "Home", href: "/" },
-  { label: "History", href: "/history" },
-  { label: "About", href: "/about" },
-];
+import { useInkMode } from "@/components/providers/InkModeProvider";
+import { Menu, X, Globe, Sun, Moon } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
+  const { mode, toggleMode } = useInkMode();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [timeString, setTimeString] = useState("");
+  const [cityCode, setCityCode] = useState("LAB");
+
+  useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const parts = tz.split("/");
+      const city = parts[parts.length - 1].replace("_", " ").substring(0, 3).toUpperCase();
+      setCityCode(city || "ZUR");
+    } catch {
+      setCityCode("ZUR");
+    }
+
+    const updateTime = () => {
+      const d = new Date();
+      setTimeString(
+        d.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const navLinks = [
+    { label: "CALCULATOR", href: "/#estimate" },
+    { label: "SPECIMENS", href: "/#specimens" },
+  ];
 
   return (
-    <motion.header
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-      className="sticky top-0 z-50 w-full"
-    >
-      {/* Glassmorphism bar */}
-      <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 backdrop-blur-xl bg-white/60 border-b border-white/40 supports-[backdrop-filter]:bg-white/40">
-        {/* ─── Logo ──────────────────────────────────────────────── */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <motion.div
-            whileHover={{ rotate: -12 }}
-            transition={{ type: "spring", stiffness: 300 }}
-            className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-ink-blue to-ink-mint shadow-md"
-          >
-            <PenLine className="w-5 h-5 text-white" strokeWidth={2.2} />
-          </motion.div>
-          <span className="text-xl font-bold tracking-tight text-ink-navy">
-            Ink<span className="text-ink-blue">Life</span>
+    <header className="sticky top-0 z-40 w-full bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--line)] transition-colors duration-400">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-2.5">
+        {/* ── Top Left: Brand / Editorial Logotype ── */}
+        <Link href="/" className="flex flex-col text-left group">
+          <span className="font-extrabold text-sm sm:text-base tracking-tighter text-[var(--foreground)] uppercase leading-none flex items-center gap-1.5">
+            INKLIFE<span className="text-[10px] text-[var(--ink-blue)] font-mono">®</span>
+          </span>
+          <span className="text-[9px] sm:text-[10px] font-mono tracking-widest text-[var(--muted)] uppercase mt-0.5">
+            INK ESTIMATION LAB
           </span>
         </Link>
 
-        {/* ─── Desktop links ────────────────────────────────────── */}
-        <ul className="hidden md:flex items-center gap-1">
-          {NAV_LINKS.map((link) => {
-            const isActive = pathname === link.href;
+        {/* ── Top Centre: Editorial Navigation Links ── */}
+        <nav className="hidden lg:flex items-center gap-6 text-[11px] font-mono tracking-wider">
+          {navLinks.map((item) => {
+            const isActive = pathname === item.href || (item.href.startsWith("/#") && pathname === "/");
             return (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className={`ink-underline relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "active text-ink-blue"
-                      : "text-ink-navy/70 hover:text-ink-navy hover:bg-white/50"
-                  }`}
-                >
-                  {link.label}
-                  {isActive && (
-                    <motion.div
-                      layoutId="nav-indicator"
-                      className="absolute inset-0 rounded-lg bg-ink-blue/5 -z-10"
-                      transition={{
-                        type: "spring",
-                        stiffness: 400,
-                        damping: 30,
-                      }}
-                    />
-                  )}
-                </Link>
-              </li>
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`transition-colors py-1 relative hover:text-[var(--ink-blue)] ${
+                  isActive ? "text-[var(--foreground)] font-semibold" : "text-[var(--muted)]"
+                }`}
+              >
+                {item.label}
+              </Link>
             );
           })}
-        </ul>
+        </nav>
 
-        {/* ─── CTA ──────────────────────────────────────────────── */}
-        <div className="hidden md:block">
-          <Link
-            href="/#estimate"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ink-blue to-ink-blue-light hover:from-ink-blue-light hover:to-ink-blue shadow-lg shadow-ink-blue/20 hover:shadow-ink-blue/30 transition-all duration-300 hover:-translate-y-0.5"
+        {/* ── Top Right: Local Time & "Change Ink Mode" ── */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* Local Time Display */}
+          <div className="hidden sm:flex flex-col text-right font-mono text-[9px] leading-tight text-[var(--muted)]">
+            <span className="tracking-widest uppercase">LOCAL TIME</span>
+            <span className="text-[var(--foreground)] font-bold">
+              {cityCode} {timeString || "00:00"}
+            </span>
+          </div>
+
+          <div className="hidden sm:block w-[1px] h-6 bg-[var(--line)]" />
+
+          {/* Change Ink Mode Button (inspired by "Change Reality") */}
+          <button
+            type="button"
+            onClick={toggleMode}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold tracking-wider uppercase border border-[var(--foreground)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Toggle between Light paper lab and Dark ultraviolet analysis mode"
           >
-            <PenLine className="w-4 h-4" />
-            Estimate Ink
-          </Link>
+            <Globe className="w-3 h-3 text-[var(--ink-blue)]" />
+            <span>CHANGE INK MODE</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-blue)]" />
+          </button>
+
+          {/* Mobile Menu Toggle */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="lg:hidden p-1.5 border border-[var(--line)] text-[var(--foreground)]"
+            aria-label="Toggle Navigation"
+          >
+            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
         </div>
+      </div>
 
-        {/* ─── Mobile toggle ────────────────────────────────────── */}
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden p-2 rounded-lg hover:bg-white/50 transition-colors text-ink-navy"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-        >
-          {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </nav>
-
-      {/* ─── Mobile menu ──────────────────────────────────────── */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="md:hidden overflow-hidden backdrop-blur-xl bg-white/80 border-b border-white/40"
-          >
-            <div className="px-6 py-4 space-y-1">
-              {NAV_LINKS.map((link, i) => {
-                const isActive = pathname === link.href;
-                return (
-                  <motion.div
-                    key={link.href}
-                    initial={{ opacity: 0, x: -16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                  >
-                    <Link
-                      href={link.href}
-                      onClick={() => setMobileOpen(false)}
-                      className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-ink-blue/10 text-ink-blue"
-                          : "text-ink-navy/70 hover:bg-white/60 hover:text-ink-navy"
-                      }`}
-                    >
-                      {link.label}
-                    </Link>
-                  </motion.div>
-                );
-              })}
-              <motion.div
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: NAV_LINKS.length * 0.05 }}
-                className="pt-2"
+      {/* Mobile Drawer */}
+      {mobileOpen && (
+        <div className="lg:hidden border-t border-[var(--line)] bg-[var(--background)] p-4 space-y-3 font-mono text-xs">
+          <div className="flex flex-col gap-2">
+            {navLinks.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className="py-1.5 border-b border-[var(--line)]/50 text-[var(--foreground)] hover:text-[var(--ink-blue)] flex justify-between items-center"
               >
-                <Link
-                  href="/#estimate"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ink-blue to-ink-blue-light shadow-lg shadow-ink-blue/20"
-                >
-                  <PenLine className="w-4 h-4" />
-                  Estimate Ink
-                </Link>
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.header>
+                <span>{item.label}</span>
+                <span className="text-[10px] text-[var(--muted)]">→</span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="pt-2 flex justify-between items-center text-[10px] text-[var(--muted)] font-mono">
+            <span>LOCAL: {cityCode} {timeString}</span>
+            <button
+              onClick={() => {
+                toggleMode();
+                setMobileOpen(false);
+              }}
+              className="px-2 py-1 border border-[var(--foreground)] text-[var(--foreground)] font-bold"
+            >
+              MODE: {mode.toUpperCase()}
+            </button>
+          </div>
+        </div>
+      )}
+    </header>
   );
 }

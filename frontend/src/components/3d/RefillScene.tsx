@@ -8,6 +8,7 @@ import { InkStream } from "./InkStream";
 import { InkBubbles } from "./InkBubbles";
 import { HeroRefillController } from "./HeroRefillController";
 import { WebGLFallback } from "./WebGLFallback";
+import { useInkMode } from "@/components/providers/InkModeProvider";
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 interface ErrorBoundaryProps {
@@ -48,36 +49,6 @@ export class SceneErrorBoundary extends Component<
   }
 }
 
-// ─── Floating Accent Orbs ───────────────────────────────────────────────────
-function AccentOrb({
-  position,
-  color,
-  size,
-  opacity = 0.5,
-}: {
-  position: [number, number, number];
-  color: string;
-  size: number;
-  opacity?: number;
-}) {
-  return (
-    <mesh position={position}>
-      <sphereGeometry args={[size, 24, 24]} />
-      <meshPhysicalMaterial
-        color={color}
-        roughness={0.2}
-        metalness={0.1}
-        transmission={0.4}
-        transparent
-        opacity={opacity}
-        clearcoat={0.8}
-        emissive={color}
-        emissiveIntensity={0.15}
-      />
-    </mesh>
-  );
-}
-
 // ─── Main Refill Scene Props ─────────────────────────────────────────────────
 export interface RefillSceneProps {
   mode: "intro" | "hero";
@@ -87,7 +58,8 @@ export interface RefillSceneProps {
   isDispensing?: boolean;
   introTransitionProgress?: number; // 0 (intro) -> 1 (hero)
   scrollProgress?: number;
-  showOrbs?: boolean;
+  isScanning?: boolean;
+  isDarkAnalysisMode?: boolean;
 }
 
 export function RefillScene({
@@ -98,8 +70,12 @@ export function RefillScene({
   isDispensing = false,
   introTransitionProgress = 1,
   scrollProgress = 0,
-  showOrbs = true,
+  isScanning = false,
+  isDarkAnalysisMode: customDark,
 }: RefillSceneProps) {
+  const { mode: contextMode } = useInkMode();
+  const isDark = customDark !== undefined ? customDark : contextMode === "dark";
+
   // Compute fluid meniscus Y in local space
   const clamp = Math.max(0, Math.min(100, inkPercentage));
   const baseY = -1.0;
@@ -119,22 +95,33 @@ export function RefillScene({
         }}
         style={{ width: "100%", height: "100%", background: "transparent" }}
       >
-        <ambientLight intensity={mode === "intro" ? 0.9 : 0.8} />
+        {/* Laboratory Lighting adjusted for Light Paper vs Dark UV mode */}
+        <ambientLight intensity={isDark ? 0.35 : mode === "intro" ? 0.95 : 0.9} />
         <hemisphereLight
           args={[
-            "#ffffff",
-            mode === "intro" ? "#0D1B2A" : "#1B2A4A",
-            mode === "intro" ? 0.8 : 0.6,
+            isDark ? "#4D78FF" : "#ffffff",
+            isDark ? "#050706" : "#E2E8F0",
+            isDark ? 0.6 : 0.7,
           ]}
         />
-        <directionalLight position={[5, 7, 5]} intensity={1.3} color="#ffffff" />
+        <directionalLight
+          position={[5, 7, 5]}
+          intensity={isDark ? 0.8 : 1.4}
+          color="#ffffff"
+        />
         <directionalLight
           position={[-4, -2, -3]}
-          intensity={0.6}
-          color="#7DE2D1"
+          intensity={isDark ? 0.9 : 0.5}
+          color={isDark ? "#62DDD1" : "#94A3B8"}
         />
-        <pointLight position={[0, 3, 3]} intensity={1.0} color="#2563EB" />
-        <pointLight position={[-3, -1, 2]} intensity={0.5} color="#F59E0B" />
+
+        {/* Ultraviolet rim lighting in dark analysis mode */}
+        {isDark && (
+          <>
+            <pointLight position={[0, 2, 3]} intensity={1.8} color="#4D78FF" distance={8} />
+            <pointLight position={[0, -2, 2]} intensity={1.2} color="#62DDD1" distance={6} />
+          </>
+        )}
 
         {/* ── Mechanical Injection Nozzle (During Intro) ── */}
         {mode === "intro" && nozzleProgress > 0.01 && (
@@ -149,7 +136,7 @@ export function RefillScene({
               active={isDispensing}
               startY={2.19}
               endY={inkTopY}
-              color="#2563EB"
+              color={isDark ? "#4D78FF" : "#225CFF"}
             />
           </group>
         )}
@@ -164,7 +151,8 @@ export function RefillScene({
             inkPercentage={inkPercentage}
             interactiveSlider={mode === "hero"}
             onInkChange={onInkChange}
-            highlightMeniscus={isDispensing}
+            highlightMeniscus={isDispensing || isScanning}
+            isDarkAnalysisMode={isDark}
           />
 
           {/* Micro Bubbles inside the liquid during active ink injection */}
@@ -172,39 +160,9 @@ export function RefillScene({
             active={isDispensing}
             baseY={baseY}
             meniscusY={inkTopY}
-            count={12}
+            count={14}
           />
         </HeroRefillController>
-
-        {/* ── Ambient Orbs (Faded in for hero mode) ── */}
-        {showOrbs && introTransitionProgress > 0.3 && (
-          <group>
-            <AccentOrb
-              position={[-3.0, 1.4, -2.0]}
-              color="#2563EB"
-              size={0.38}
-              opacity={0.45 * introTransitionProgress}
-            />
-            <AccentOrb
-              position={[3.2, -0.9, -2.5]}
-              color="#7DE2D1"
-              size={0.48}
-              opacity={0.5 * introTransitionProgress}
-            />
-            <AccentOrb
-              position={[-2.4, -1.8, -1.2]}
-              color="#F59E0B"
-              size={0.28}
-              opacity={0.4 * introTransitionProgress}
-            />
-            <AccentOrb
-              position={[2.4, 2.0, -2.2]}
-              color="#2563EB"
-              size={0.32}
-              opacity={0.45 * introTransitionProgress}
-            />
-          </group>
-        )}
       </Canvas>
     </SceneErrorBoundary>
   );

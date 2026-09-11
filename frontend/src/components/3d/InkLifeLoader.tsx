@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Canvas } from "@react-three/fiber";
-import { PenLine, ArrowRight } from "lucide-react";
 import { RefillModel } from "./RefillModel";
 import { InjectionNozzle } from "./InjectionNozzle";
 import { InkStream } from "./InkStream";
@@ -14,68 +13,90 @@ export interface InkLifeLoaderProps {
   forcePlay?: boolean;
 }
 
-export function InkLifeLoader({ onComplete }: InkLifeLoaderProps) {
+export function InkLifeLoader({ onComplete, forcePlay = false }: InkLifeLoaderProps) {
   const [isVisible, setIsVisible] = useState(true);
-  const [statusText, setStatusText] = useState("Preparing your refill…");
+  const [statusText, setStatusText] = useState("INITIALISING INKLIFE");
+  const [techPhase, setTechPhase] = useState<string>("SYSTEM BOOT / 01");
   const [percentIndicator, setPercentIndicator] = useState(0);
-  const [inkLevel, setInkLevel] = useState(2); // starts almost empty (residual trace)
-  const [nozzleProgress, setNozzleProgress] = useState(0); // 0 = left, 1 = docked
+  const [inkLevel, setInkLevel] = useState(0);
+  const [nozzleProgress, setNozzleProgress] = useState(0);
   const [isDispensing, setIsDispensing] = useState(false);
   const [refillRotation, setRefillRotation] = useState<[number, number, number]>([0, 0, 0]);
+  const [laserScanY, setLaserScanY] = useState(0);
 
   const animRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // Check sessionStorage if not forcePlay
+    if (!forcePlay) {
+      try {
+        const seen = sessionStorage.getItem("inklife_intro_seen");
+        if (seen === "true") {
+          setIsVisible(false);
+          onComplete();
+          return;
+        }
+      } catch {
+        // Continue if storage fails
+      }
+    }
+
     const tick = (now: number) => {
       if (!startTimeRef.current) startTimeRef.current = now;
       const elapsed = now - startTimeRef.current;
 
-      // Phase 1: Calibrating & Nozzle entry (0 - 800ms)
-      if (elapsed < 800) {
-        const p = elapsed / 800;
-        const easeP = Math.min(1, p * 1.15);
-        setNozzleProgress(easeP);
-        setInkLevel(2);
+      // Phase 1: Wireframe Detection & Scanning (0 - 750ms)
+      if (elapsed < 750) {
+        const p = elapsed / 750;
+        setNozzleProgress(0);
+        setInkLevel(0);
         setIsDispensing(false);
-        setStatusText("Calibrating transparent refill…");
-        setPercentIndicator(Math.round(p * 35));
+        setStatusText("REFILL DETECTED • MATERIAL: TRANSPARENT POLYMER");
+        setTechPhase("OPTICAL SCAN / 01");
+        setPercentIndicator(Math.round(p * 25));
+        setLaserScanY(p * 100);
         setRefillRotation([0, 0, 0]);
       }
-      // Phase 2: Injecting Blue Ink (800ms - 2400ms)
-      else if (elapsed < 2400) {
-        const p = (elapsed - 800) / 1600;
-        const currentInk = Math.round(2 + p * 63); // Rises from 2% to 65%
+      // Phase 2: Docking Nozzle & Channel Locating (750ms - 1300ms)
+      else if (elapsed < 1300) {
+        const p = (elapsed - 750) / 550;
+        setNozzleProgress(Math.min(1, p * 1.1));
+        setInkLevel(0);
+        setIsDispensing(false);
+        setStatusText("INK CHANNEL LOCATED • DOCKING INJECTOR");
+        setTechPhase("PRECISION ALIGNMENT / 02");
+        setPercentIndicator(Math.round(25 + p * 20));
+        setRefillRotation([0, 0, 0]);
+      }
+      // Phase 3: Injecting Sample Fluid (1300ms - 2700ms)
+      else if (elapsed < 2700) {
+        const p = (elapsed - 1300) / 1400;
+        const currentInk = Math.round(p * 65); // Rises 0% to 65%
         setNozzleProgress(1.0);
         setInkLevel(currentInk);
         setIsDispensing(true);
-        setStatusText("Injecting blue ink…");
-        setPercentIndicator(Math.round(35 + p * 30));
+        setStatusText(`INJECTING SAMPLE • FLOW: ${currentInk}% VOL`);
+        setTechPhase("FLUID SAMPLE INJECTION / 03");
+        setPercentIndicator(Math.round(45 + p * 40));
         setRefillRotation([0, 0, 0]);
       }
-      // Phase 3: Detecting & Nozzle Retraction (2400ms - 3100ms)
-      else if (elapsed < 3100) {
-        const p = (elapsed - 2400) / 700;
-        setNozzleProgress(Math.max(0, 1.0 - p)); // Retracts left
+      // Phase 4: Calibration Complete & Retraction (2700ms - 3200ms)
+      else if (elapsed < 3200) {
+        const p = (elapsed - 2700) / 500;
+        setNozzleProgress(Math.max(0, 1.0 - p * 1.2));
         setInkLevel(65);
         setIsDispensing(false);
-        setStatusText("Ink level detected: 65%");
-        setPercentIndicator(Math.round(65 + p * 35));
-        setRefillRotation([0, 0, 0]);
+        setStatusText("CALIBRATION COMPLETE • READY FOR ESTIMATION");
+        setTechPhase("BENCHMARK VERIFIED / 04");
+        setPercentIndicator(Math.round(85 + p * 15));
+        setRefillRotation([p * 0.15, p * 0.28, 0]);
       }
-      // Phase 4: Diagonal Rotation & Hero Transition (3100ms - 3600ms)
-      else if (elapsed < 3600) {
-        const p = (elapsed - 3100) / 500;
-        setNozzleProgress(0);
-        setInkLevel(65);
-        setIsDispensing(false);
-        setStatusText("Ready");
-        setPercentIndicator(100);
-        // Rotate smoothly toward hero diagonal angle [0.22, 0.38, 0.10]
-        setRefillRotation([p * 0.22, p * 0.38, p * 0.10]);
-      }
-      // Finished
+      // Phase 5: Transition into Hero (3200ms - 3500ms)
       else {
+        try {
+          sessionStorage.setItem("inklife_intro_seen", "true");
+        } catch {}
         setIsVisible(false);
         onComplete();
         return;
@@ -89,124 +110,105 @@ export function InkLifeLoader({ onComplete }: InkLifeLoaderProps) {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [onComplete]);
+  }, [onComplete, forcePlay]);
 
   const handleSkip = () => {
     if (animRef.current) cancelAnimationFrame(animRef.current);
+    try {
+      sessionStorage.setItem("inklife_intro_seen", "true");
+    } catch {}
     setIsVisible(false);
     onComplete();
   };
 
-  // Meniscus Y coordinate calculation in local space
   const localBaseY = -1.0;
   const localTravelHeight = 2.7;
   const localInkHeight = Math.max(0.04, (inkLevel / 100) * localTravelHeight);
   const localInkTopY = localBaseY + localInkHeight;
 
-  // Refill group transformation
-  const refillScale = 0.92;
-  const refillOffsetY = -0.28;
-
-  // World coordinates for nozzle docking and ink stream
-  const refillTopOpeningWorldY = 2.20 * refillScale + refillOffsetY; // ~1.744
-  const nozzleBaseY = refillTopOpeningWorldY + 0.09; // ~1.834
+  const refillScale = 0.96;
+  const refillOffsetY = -0.22;
   const worldMeniscusY = localInkTopY * refillScale + refillOffsetY;
 
   return (
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          key="inklife-cinematic-loader"
+          key="inklife-swiss-loader"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.6, ease: "easeInOut" }}
-          className="fixed inset-0 z-[100] flex flex-col justify-between bg-[#0D1B2A] text-white p-6 sm:p-10 select-none overflow-hidden pointer-events-auto"
+          transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-[100] flex flex-col justify-between bg-[#F5F4EF] text-[#0B0F14] p-6 sm:p-10 select-none overflow-hidden lab-grid"
         >
-          {/* ── Top Bar: Brand Logo & Skip Button ── */}
-          <div className="relative z-20 flex items-center justify-between w-full max-w-7xl mx-auto">
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-ink-blue to-ink-mint shadow-lg">
-                <PenLine className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-sm font-bold tracking-widest uppercase text-white/90">
-                Ink<span className="text-ink-mint">Life</span>
+          {/* ── Top Header ── */}
+          <div className="relative z-20 flex items-center justify-between w-full max-w-7xl mx-auto border-b border-[rgba(11,15,20,0.15)] pb-4 font-mono text-[11px]">
+            <div className="flex items-center gap-3">
+              <span className="font-extrabold tracking-tighter uppercase text-sm">
+                INKLIFE<span className="text-[#225CFF]">®</span>
+              </span>
+              <span className="text-[rgba(11,15,20,0.4)]">/</span>
+              <span className="tracking-widest uppercase text-[rgba(11,15,20,0.6)]">
+                CALIBRATION LAB
               </span>
             </div>
 
-            {/* Skip Intro Button */}
-            <button
-              onClick={handleSkip}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium text-white/70 hover:text-white bg-white/10 hover:bg-white/20 border border-white/15 transition-all shadow-md active:scale-95 cursor-pointer"
-            >
-              Skip intro
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-4">
+              <span className="hidden sm:inline-block text-[rgba(11,15,20,0.5)]">
+                {techPhase}
+              </span>
+              <button
+                type="button"
+                onClick={handleSkip}
+                className="px-3 py-1.5 border border-[#0B0F14] bg-[#FFFFFF] text-[#0B0F14] hover:bg-[#0B0F14] hover:text-[#FFFFFF] transition-all text-[10px] font-bold tracking-wider uppercase cursor-pointer"
+              >
+                SKIP INTRO →
+              </button>
+            </div>
           </div>
 
-          {/* ── Center: Dedicated 3D Canvas with Empty Refill & Robotic Nozzle ── */}
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            {/* Technical HUD Framing */}
-            <div className="absolute w-80 h-[510px] rounded-3xl border border-white/10 pointer-events-none flex items-center justify-center shadow-2xl bg-white/[0.01] backdrop-blur-[1px]">
-              <div className="absolute top-4 left-4 text-[9px] uppercase font-mono tracking-widest text-white/35">
-                [REFILL_CARTRIDGE_01]
-              </div>
-              <div className="absolute top-4 right-4 text-[9px] uppercase font-mono tracking-widest text-ink-mint/70">
-                CALIBRATING
-              </div>
-              <div className="absolute bottom-4 left-4 text-[9px] uppercase font-mono tracking-widest text-white/30">
-                CAPACITY: 1.0 ML
-              </div>
-              <div className="absolute bottom-4 right-4 text-[9px] uppercase font-mono tracking-widest text-ink-mint/70">
-                TARGET: 65%
-              </div>
-            </div>
-
-            {/* R3F 3D Scene */}
-            <div className="w-full h-full">
+          {/* ── Center 3D Stage with Technical Measurement Overlays ── */}
+          <div className="relative flex-1 w-full flex items-center justify-center">
+            {/* Center Canvas */}
+            <div className="absolute inset-0 z-10">
               <Canvas
-                camera={{ position: [0, 0.25, 6.2], fov: 42 }}
+                camera={{ position: [0, 0, 5.8], fov: 40 }}
                 dpr={[1, 1.5]}
-                gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+                gl={{ antialias: true, alpha: true }}
                 style={{ width: "100%", height: "100%", background: "transparent" }}
               >
-                <ambientLight intensity={0.95} />
-                <hemisphereLight args={["#ffffff", "#0D1B2A", 0.75]} />
-                <directionalLight position={[5, 7, 5]} intensity={1.4} color="#ffffff" />
-                <directionalLight position={[-4, -2, -3]} intensity={0.6} color="#7DE2D1" />
-                <pointLight position={[0, 3, 3]} intensity={1.2} color="#2563EB" />
-                <pointLight position={[-3, -1, 2]} intensity={0.6} color="#F59E0B" />
+                <ambientLight intensity={1.1} />
+                <directionalLight position={[5, 8, 5]} intensity={1.4} color="#ffffff" />
+                <directionalLight position={[-4, -2, -3]} intensity={0.5} color="#94A3B8" />
+                <pointLight position={[0, 2, 2.5]} intensity={1.2} color="#225CFF" />
 
-                {/* Robotic Mechanical Injection Nozzle entering from left */}
+                {/* Injection Nozzle */}
                 {nozzleProgress > 0.01 && (
                   <group>
                     <InjectionNozzle
                       progress={nozzleProgress}
                       dispensing={isDispensing}
-                      baseY={nozzleBaseY}
-                      color="#2563EB"
                     />
-
-                    {/* Royal-Blue Ink Stream pouring from nozzle into refill opening */}
                     <InkStream
                       active={isDispensing}
-                      startY={refillTopOpeningWorldY}
+                      startY={2.20 * refillScale + refillOffsetY + 0.12}
                       endY={worldMeniscusY}
-                      color="#2563EB"
+                      color="#225CFF"
                     />
                   </group>
                 )}
 
-                {/* Vertical Transparent Pen Refill in Screen Center */}
-                <group position={[0, refillOffsetY, 0]} rotation={refillRotation} scale={refillScale}>
+                {/* Central Refill Model */}
+                <group
+                  position={[0, refillOffsetY, 0]}
+                  rotation={refillRotation}
+                  scale={refillScale}
+                >
                   <RefillModel
                     inkPercentage={inkLevel}
-                    highlightMeniscus={isDispensing}
                     interactiveSlider={false}
+                    highlightMeniscus={isDispensing}
                     showSliderTooltip={false}
-                    colorOverride="#2563EB"
                   />
-
-                  {/* Micro Bubbles rising through ink during active injection */}
                   <InkBubbles
                     active={isDispensing}
                     baseY={localBaseY}
@@ -216,34 +218,78 @@ export function InkLifeLoader({ onComplete }: InkLifeLoaderProps) {
                 </group>
               </Canvas>
             </div>
+
+            {/* Laser Height Scan Line (Visual element in Phase 1) */}
+            {laserScanY > 0 && laserScanY < 100 && (
+              <div
+                className="absolute left-1/2 -translate-x-1/2 w-48 h-[1px] bg-[#225CFF] shadow-[0_0_8px_#225CFF] pointer-events-none transition-all duration-75 z-20"
+                style={{ top: `${laserScanY}%` }}
+              />
+            )}
+
+            {/* Technical Annotation Boxes beside Refill */}
+            <div className="hidden md:flex absolute inset-0 pointer-events-none items-center justify-between max-w-4xl mx-auto px-6 font-mono text-[10px] text-[rgba(11,15,20,0.6)]">
+              {/* Left Side Telemetry */}
+              <div className="space-y-4 border-l border-[rgba(11,15,20,0.2)] pl-4">
+                <div>
+                  <div className="font-bold text-[#0B0F14]">GEOMETRY</div>
+                  <div>CYLINDER 3.0 × 0.33M</div>
+                </div>
+                <div>
+                  <div className="font-bold text-[#0B0F14]">POLYMER</div>
+                  <div>PP CLR-14 / HIGH TRANSMISSION</div>
+                </div>
+                <div>
+                  <div className="font-bold text-[#0B0F14]">BALLPOINT TIP</div>
+                  <div>TUNGSTEN CARBIDE 1.0MM</div>
+                </div>
+              </div>
+
+              {/* Right Side Telemetry */}
+              <div className="space-y-4 border-r border-[rgba(11,15,20,0.2)] pr-4 text-right">
+                <div>
+                  <div className="font-bold text-[#0B0F14]">SAMPLE VOLUME</div>
+                  <div className="text-[#225CFF] font-bold">{inkLevel}% CAPACITY</div>
+                </div>
+                <div>
+                  <div className="font-bold text-[#0B0F14]">VISCOSITY</div>
+                  <div>NORMAL BALLPOINT PASTE</div>
+                </div>
+                <div>
+                  <div className="font-bold text-[#0B0F14]">NATIVE FLOW</div>
+                  <div>PRE-INCLUDED IN CLAIM</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* ── Bottom Bar: Status Text & Calibrated Percentage Progress ── */}
-          <div className="relative z-20 w-full max-w-md mx-auto flex flex-col items-center text-center pb-2">
-            {/* Fine progress track (0% -> 35% -> 65% -> 100%) */}
-            <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-3.5 shadow-inner">
+          {/* ── Bottom Technical Telemetry Bar ── */}
+          <div className="relative z-20 w-full max-w-7xl mx-auto font-mono">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs mb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#225CFF] animate-pulse" />
+                <span className="font-bold tracking-wider uppercase text-[#0B0F14]">
+                  {statusText}
+                </span>
+              </div>
+              <span className="font-bold text-[#225CFF] tracking-widest text-right">
+                [{percentIndicator.toString().padStart(3, "0")}%]
+              </span>
+            </div>
+
+            {/* Precision Hairline Progress Bar */}
+            <div className="w-full h-1 bg-[rgba(11,15,20,0.1)] overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-ink-blue via-ink-blue-light to-ink-mint transition-all duration-100 ease-out shadow-sm"
+                className="h-full bg-[#225CFF] transition-all duration-100 ease-out"
                 style={{ width: `${percentIndicator}%` }}
               />
             </div>
 
-            <div className="flex items-center justify-between w-full text-xs font-mono text-white/50 mb-1.5">
-              <span className="text-white/90 font-sans text-xs tracking-wide font-medium">
-                {statusText}
-              </span>
-              <span className="text-ink-mint font-semibold text-xs font-mono">
-                {percentIndicator}%
-              </span>
+            {/* Micro grid coordinates */}
+            <div className="flex items-center justify-between text-[9px] text-[rgba(11,15,20,0.4)] tracking-widest pt-2">
+              <span>LAT 47.3769° N, LON 8.5417° E</span>
+              <span>CALIBRATION SEQUENCE 01919-V2</span>
             </div>
-
-            <p className="text-[10px] text-white/35 tracking-widest uppercase font-mono">
-              {isDispensing
-                ? "INJECTING ROYAL-BLUE INK STREAM"
-                : nozzleProgress > 0
-                  ? "ALIGNING PRECISION DISPENSER"
-                  : "PREPARING REFILL CHAMBER"}
-            </p>
           </div>
         </motion.div>
       )}

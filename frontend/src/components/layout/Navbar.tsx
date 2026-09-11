@@ -8,7 +8,6 @@ import { PenLine, Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
-  { label: "Estimate", href: "/predict" },
   { label: "History", href: "/history" },
   { label: "About", href: "/about" },
 ];
@@ -75,7 +74,7 @@ export function Navbar() {
         {/* ─── CTA ──────────────────────────────────────────────── */}
         <div className="hidden md:block">
           <Link
-            href="/predict"
+            href="/#estimate"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ink-blue to-ink-blue-light hover:from-ink-blue-light hover:to-ink-blue shadow-lg shadow-ink-blue/20 hover:shadow-ink-blue/30 transition-all duration-300 hover:-translate-y-0.5"
           >
             <PenLine className="w-4 h-4" />
@@ -134,7 +133,7 @@ export function Navbar() {
                 className="pt-2"
               >
                 <Link
-                  href="/predict"
+                  href="/#estimate"
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-2 w-full px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-ink-blue to-ink-blue-light shadow-lg shadow-ink-blue/20"
                 >

@@ -20,24 +20,23 @@ import {
 
 const pens = new Hono<HonoEnv>();
 
-// ─── GET /api/pens/search ─────────────────────────────────────────────────────
+// ─── GET /api/pens and GET /api/pens/search ───────────────────────────────────
 
-pens.get(
-  "/search",
-  zValidator("query", penSearchQuerySchema),
-  async (c) => {
-    const query = c.req.valid("query");
-    const db = createDb(c.env.DB);
-    const result = await penService.searchPens(db, query);
+const handleSearch = async (c: any) => {
+  const query = c.req.valid("query");
+  const db = createDb(c.env.DB);
+  const result = await penService.searchPens(db, query);
 
-    return c.json({
-      success: true,
-      data: result.items,
-      pagination: result.pagination,
-      requestId: c.get("requestId"),
-    });
-  }
-);
+  return c.json({
+    success: true,
+    data: result.items,
+    pagination: result.pagination,
+    requestId: c.get("requestId"),
+  });
+};
+
+pens.get("/", zValidator("query", penSearchQuerySchema), handleSearch);
+pens.get("/search", zValidator("query", penSearchQuerySchema), handleSearch);
 
 // ─── GET /api/pens/:penId ─────────────────────────────────────────────────────
 

@@ -1,62 +1,58 @@
 /**
- * InkLife Prediction Engine v2.0.0
+ * InkLife Prediction Engine v2.1.0
  *
- * All functions here are PURE (no I/O, no side effects).
- * This file is fully unit-testable without any Worker/D1 context.
- *
- * Critical accuracy rules enforced:
- *  1. Manufacturer's total writing-length claim already incorporates its native flow.
- *  2. Never multiply the manufacturer claim by its own flow rate again.
- *  3. flowCategory is used only as a consumption-correction divisor.
- *  4. Never invent exact writing-length claims – use category fallbacks with low confidence.
+ * Core physical & handwriting calculation engine.
+ * Converts ideal manufacturer claim conditions into realistic handwriting estimates.
  */
 
 import type { WritingStyle, NotebookType } from "../validators/prediction.validators";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-/** ENGINE_VERSION is embedded in every persisted prediction for traceability. */
-export const ENGINE_VERSION = "2.0.0";
+export const ENGINE_VERSION = "2.1.0";
 
-/**
- * Flow category consumption correction factors.
- * Higher factor → faster ink consumption → fewer usable metres from the same ink.
- * Note: fiber_tip and felt_tip are mapped to the "low_flow" factor (0.85)
- * because they typically have lower ink consumption relative to rated distance.
- */
+export const CLAIM_ALREADY_INCLUDES_NATIVE_FLOW = true;
+
+export const WRITING_STYLE_FACTORS = {
+  light: 0.9,
+  normal: 1.0,
+  heavy: 1.2,
+} as const;
+
+// Converts ideal manufacturer claim conditions into a realistic
+// handwriting estimate. Do not remove this.
+export const REAL_WORLD_EFFICIENCY = 0.85;
+
+export const BOOK_CONFIG = {
+  long_book: {
+    label: "Long Book",
+    linesPerPage: 30,
+    estimatedWritingMetresPerPage: 7.2,
+  },
+  queen_book: {
+    label: "Queen Book",
+    linesPerPage: 25,
+    estimatedWritingMetresPerPage: 6,
+  },
+  king_book: {
+    label: "King Book",
+    linesPerPage: 20,
+    estimatedWritingMetresPerPage: 4.8,
+  },
+} as const;
+
 export const FLOW_FACTORS: Record<string, number> = {
+  low_flow: 0.9,
   normal_ballpoint: 1.0,
-  smooth_low_viscosity: 1.15,
-  gel: 1.3,
-  liquid_rollerball: 1.45,
-  // low-flow variants
-  fiber_tip: 0.85,
-  felt_tip: 0.85,
+  smooth_low_viscosity: 1.1,
+  gel: 1.25,
+  liquid_rollerball: 1.35,
+  fiber_tip: 0.9,
+  felt_tip: 0.9,
 };
 
-/** Default flow factor for unknown/unlisted categories. */
 export const DEFAULT_FLOW_FACTOR = 1.0;
 
-export const WRITING_STYLE_FACTORS: Record<WritingStyle, number> = {
-  light: 0.85,
-  normal: 1.0,
-  heavy: 1.25,
-};
-
-export const NOTEBOOK_FACTORS: Record<NotebookType, number> = {
-  long_book: 0.85,
-  queen_book: 1.0,
-  king_book: 1.2,
-};
-
-/** Metres of writing per queen-book page (baseline). */
-export const METRES_PER_QUEEN_PAGE = 4;
-
-/**
- * Category-based fallback writing-length estimates (metres).
- * Used when no manufacturer claim is available.
- * These are conservative mid-range estimates — mark isFallbackEstimate: true.
- */
 export const CATEGORY_FALLBACK_METRES: Record<string, number> = {
   normal_ballpoint: 2000,
   liquid_rollerball: 5000,
@@ -66,18 +62,13 @@ export const CATEGORY_FALLBACK_METRES: Record<string, number> = {
   felt_tip: 600,
 };
 
-/** Default fallback when category is unknown. */
 export const DEFAULT_FALLBACK_METRES = 1500;
 
-// ─── Input / Output types ─────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export type PredictionEngineInput = {
-  totalWritingLengthMeters: number;
-  flowCategory: string;
-  inkRating: number; // 0–10
-  writingStyle: WritingStyle;
-  notebookType: NotebookType;
-};
+export function safeNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
 
 export type PageEstimates = {
   longBook: number;
@@ -85,98 +76,154 @@ export type PageEstimates = {
   kingBook: number;
 };
 
+export function calculatePageEstimates(usableDistanceMeters: number): PageEstimates {
+  const safeUsable = Math.max(0, safeNumber(usableDistanceMeters));
+  return {
+    longBook: Math.floor(
+      safeUsable / BOOK_CONFIG.long_book.estimatedWritingMetresPerPage
+    ),
+    queenBook: Math.floor(
+      safeUsable / BOOK_CONFIG.queen_book.estimatedWritingMetresPerPage
+    ),
+    kingBook: Math.floor(
+      safeUsable / BOOK_CONFIG.king_book.estimatedWritingMetresPerPage
+    ),
+  };
+}
+
+export function getSelectedPageEstimate(
+  notebookType: NotebookType | string,
+  estimates: PageEstimates
+): number {
+  const map: Record<string, number> = {
+    long_book: estimates.longBook,
+    queen_book: estimates.queenBook,
+    king_book: estimates.kingBook,
+  };
+  return map[notebookType] ?? estimates.queenBook;
+}
+
+export function getFlowFactor(flowCategory?: string): number {
+  if (!flowCategory) return DEFAULT_FLOW_FACTOR;
+  return FLOW_FACTORS[flowCategory] ?? DEFAULT_FLOW_FACTOR;
+}
+
+export function getWritingStyleFactor(writingStyle: WritingStyle): number {
+  return WRITING_STYLE_FACTORS[writingStyle] ?? 1.0;
+}
+
+// ─── Calculation Input & Result ───────────────────────────────────────────────
+
+export type PredictionEngineInput = {
+  claimedWritingDistanceMeters?: number | undefined;
+  totalWritingLengthMeters?: number | undefined;
+  inkPercentage?: number | undefined;
+  inkRating?: number | undefined;
+  writingStyle: WritingStyle;
+  selectedNotebook?: NotebookType | undefined;
+  notebookType?: NotebookType | undefined;
+  flowCategory?: string | undefined;
+  claimAlreadyIncludesNativeFlow?: boolean | undefined;
+};
+
 export type PredictionEngineResult = {
-  inkFraction: number;
   inkPercentage: number;
+  inkFraction: number;
+  inkRating: number;
+  totalWritingLengthMeters: number;
+  claimedWritingDistanceMeters: number;
   remainingDistanceMeters: number;
   usableDistanceMeters: number;
   pageEstimates: PageEstimates;
+  selectedPages: number;
   estimatedPages: number;
   flowFactor: number;
   writingStyleFactor: number;
 };
 
-// ─── Pure helper functions ────────────────────────────────────────────────────
+export function calculateInkPrediction(input: PredictionEngineInput): PredictionEngineResult {
+  const rawPercentage =
+    input.inkPercentage !== undefined
+      ? input.inkPercentage
+      : input.inkRating !== undefined
+      ? input.inkRating * 10
+      : 0;
 
-/** Get the flow factor for a given flow category. */
-export function getFlowFactor(flowCategory: string): number {
-  return FLOW_FACTORS[flowCategory] ?? DEFAULT_FLOW_FACTOR;
-}
+  const safePercentage = Math.min(100, Math.max(0, safeNumber(rawPercentage)));
 
-/** Get the writing style factor. */
-export function getWritingStyleFactor(writingStyle: WritingStyle): number {
-  return WRITING_STYLE_FACTORS[writingStyle];
-}
+  const safeClaimedDistance = Math.max(
+    0,
+    safeNumber(input.claimedWritingDistanceMeters ?? input.totalWritingLengthMeters)
+  );
 
-/** Get the notebook factor. */
-export function getNotebookFactor(notebookType: NotebookType): number {
-  return NOTEBOOK_FACTORS[notebookType];
-}
+  const writingStyle = input.writingStyle;
+  const writingStyleFactor = WRITING_STYLE_FACTORS[writingStyle] ?? 1;
 
-/**
- * Calculate pages for a specific notebook type from usable distance.
- * pages = usableDistanceMeters / (METRES_PER_QUEEN_PAGE * notebookFactor)
- * Rounded to nearest integer.
- */
-export function calcPages(usableDistanceMeters: number, notebookType: NotebookType): number {
-  const factor = NOTEBOOK_FACTORS[notebookType];
-  return Math.round(usableDistanceMeters / (METRES_PER_QUEEN_PAGE * factor));
-}
+  const selectedNotebook = (input.selectedNotebook ?? input.notebookType ?? "queen_book") as NotebookType;
 
-/**
- * Core prediction calculation. All inputs must be validated before calling.
- *
- * Formula:
- *   inkFraction               = inkRating / 10
- *   remainingDistanceMeters   = totalWritingLengthMeters × inkFraction
- *   usableDistanceMeters      = remainingDistanceMeters / (flowFactor × writingStyleFactor)
- *   longBookPages             = usableDistanceMeters / (4 × 0.85)
- *   queenBookPages            = usableDistanceMeters / (4 × 1.0)
- *   kingBookPages             = usableDistanceMeters / (4 × 1.2)
- *   estimatedPages            = pages for the requested notebookType
- */
-export function calculatePrediction(input: PredictionEngineInput): PredictionEngineResult {
-  const { totalWritingLengthMeters, flowCategory, inkRating, writingStyle, notebookType } = input;
+  // Exact distance represented by the visible ink percentage.
+  const remainingDistanceMeters = safeClaimedDistance * (safePercentage / 100);
 
-  const inkFraction = inkRating / 10;
-  const inkPercentage = inkRating * 10;
+  // Flow adjustment: Do not apply flow factor to verified manufacturer claims.
+  // Only use fallbackFlowFactor when estimating an unknown pen without a manufacturer claim.
+  const claimAlreadyIncludesNativeFlow =
+    input.claimAlreadyIncludesNativeFlow ?? CLAIM_ALREADY_INCLUDES_NATIVE_FLOW;
+  const flowFactor = FLOW_FACTORS[input.flowCategory ?? "normal_ballpoint"] ?? 1;
+  const flowAdjustment = claimAlreadyIncludesNativeFlow ? 1 : flowFactor;
 
-  const flowFactor = getFlowFactor(flowCategory);
-  const writingStyleFactor = getWritingStyleFactor(writingStyle);
+  // Manufacturer claims are ideal test values.
+  // Apply real-world handwriting efficiency.
+  // Do not apply native ink-flow factor again because it is already
+  // included in the manufacturer's writing-distance claim.
+  const usableDistanceMeters =
+    safePercentage === 0 || safeClaimedDistance === 0
+      ? 0
+      : (remainingDistanceMeters * REAL_WORLD_EFFICIENCY) /
+        (writingStyleFactor * flowAdjustment);
 
-  const remainingDistanceMeters = totalWritingLengthMeters * inkFraction;
-  const usableDistanceMeters = remainingDistanceMeters / (flowFactor * writingStyleFactor);
-
-  const pageEstimates: PageEstimates = {
-    longBook: calcPages(usableDistanceMeters, "long_book"),
-    queenBook: calcPages(usableDistanceMeters, "queen_book"),
-    kingBook: calcPages(usableDistanceMeters, "king_book"),
+  const pageEstimates = {
+    longBook: Math.floor(
+      usableDistanceMeters /
+      BOOK_CONFIG.long_book.estimatedWritingMetresPerPage
+    ),
+    queenBook: Math.floor(
+      usableDistanceMeters /
+      BOOK_CONFIG.queen_book.estimatedWritingMetresPerPage
+    ),
+    kingBook: Math.floor(
+      usableDistanceMeters /
+      BOOK_CONFIG.king_book.estimatedWritingMetresPerPage
+    ),
   };
 
-  const notebookMap: Record<NotebookType, keyof PageEstimates> = {
-    long_book: "longBook",
-    queen_book: "queenBook",
-    king_book: "kingBook",
+  const selectedPagesMap = {
+    long_book: pageEstimates.longBook,
+    queen_book: pageEstimates.queenBook,
+    king_book: pageEstimates.kingBook,
   };
-  const estimatedPages = pageEstimates[notebookMap[notebookType]];
+
+  const selectedPages = selectedPagesMap[selectedNotebook] ?? pageEstimates.queenBook;
 
   return {
-    inkFraction,
-    inkPercentage,
+    inkPercentage: safePercentage,
+    inkFraction: safePercentage / 100,
+    inkRating: safePercentage / 10,
+    totalWritingLengthMeters: safeClaimedDistance,
+    claimedWritingDistanceMeters: safeClaimedDistance,
     remainingDistanceMeters: Math.round(remainingDistanceMeters),
-    usableDistanceMeters: Math.round(usableDistanceMeters),
+    usableDistanceMeters: Math.round(Math.max(0, usableDistanceMeters)),
     pageEstimates,
-    estimatedPages,
+    selectedPages,
+    estimatedPages: selectedPages,
     flowFactor,
     writingStyleFactor,
   };
 }
 
-/**
- * Determine the writing-length source for a pen.
- * Returns the manufacturer's claimed length if available, otherwise falls back
- * to a category estimate and sets isFallbackEstimate: true.
- */
+export const calculatePrediction = calculateInkPrediction;
+
+// ─── Metadata & Fallback Resolvers ────────────────────────────────────────────
+
 export function resolveWritingLength(
   nominalMileageM: number | null | undefined,
   flowCategory: string
@@ -188,9 +235,6 @@ export function resolveWritingLength(
   return { totalWritingLengthMeters: fallback, isFallbackEstimate: true };
 }
 
-/**
- * Determine confidence level based on available data quality.
- */
 export function resolveConfidence(
   isFallbackEstimate: boolean,
   hasPenModel: boolean

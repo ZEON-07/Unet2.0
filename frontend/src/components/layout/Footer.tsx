@@ -3,7 +3,7 @@ import { PenLine, Globe, MessageCircle, Heart } from "lucide-react";
 
 const FOOTER_LINKS = {
   Product: [
-    { label: "Estimate Ink", href: "/predict" },
+    { label: "Estimate Ink", href: "/#estimate" },
     { label: "History", href: "/history" },
     { label: "How It Works", href: "/about" },
   ],

@@ -121,9 +121,11 @@ export async function createPrediction(
   const calc = calculatePrediction({
     totalWritingLengthMeters,
     flowCategory: pen.flowCategory,
+    inkPercentage: body.inkPercentage,
     inkRating: body.inkRating,
     writingStyle: body.writingStyle,
     notebookType: body.notebookType,
+    claimAlreadyIncludesNativeFlow: !isFallbackEstimate,
   });
 
   // 4. Determine confidence
@@ -142,7 +144,7 @@ export async function createPrediction(
   const dto: PredictionResponseDto = {
     id,
     penName: pen.penName,
-    inkRating: body.inkRating,
+    inkRating: calc.inkRating,
     inkPercentage: calc.inkPercentage,
     totalWritingLengthMeters,
     remainingDistanceMeters: calc.remainingDistanceMeters,
@@ -175,7 +177,8 @@ export async function createPrediction(
       enteredModel: body.enteredModel,
       writingStyle: body.writingStyle,
       notebookType: body.notebookType,
-      inkRating: body.inkRating,
+      inkPercentage: calc.inkPercentage,
+      inkRating: calc.inkRating,
       isFallbackEstimate,
     }),
   });

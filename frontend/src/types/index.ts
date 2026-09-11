@@ -81,13 +81,93 @@ export interface PenRecord {
   nickname?: string;
 }
 
+// ─── Backend API Types ───────────────────────────────────────────────────────
+
+export type WritingStyle = "light" | "normal" | "heavy";
+export type NotebookType = "long_book" | "queen_book" | "king_book";
+
+export interface Brand {
+  id: string;
+  name: string;
+  slug: string;
+  country?: string | null;
+  websiteUrl?: string | null;
+  description?: string | null;
+  createdAt?: string;
+}
+
+export interface PenModel {
+  id: string;
+  name: string;
+  slug: string;
+  flowCategory: string;
+  tipSizeMm: number | null;
+  nominalMileageM: number | null;
+  brandId: string;
+  brandName?: string;
+  brandSlug?: string;
+}
+
+export interface CreatePredictionBody {
+  penModelId?: string;
+  enteredBrand?: string;
+  enteredModel?: string;
+  inkPercentage?: number; // 0-100 exact slider percentage
+  inkRating?: number; // 0-10 legacy
+  writingStyle: WritingStyle;
+  notebookType: NotebookType;
+}
+
+export interface PredictionSource {
+  title: string;
+  url: string | null;
+  checkedAt: string;
+}
+
+export interface PredictionResponseDto {
+  id: string;
+  penName: string;
+  inkRating: number;
+  inkPercentage: number;
+  totalWritingLengthMeters: number;
+  remainingDistanceMeters: number;
+  usableDistanceMeters: number;
+  estimatedPages: number;
+  pageEstimates: {
+    longBook: number;
+    queenBook: number;
+    kingBook: number;
+  };
+  flowCategory: string;
+  writingStyle: string;
+  notebookType: string;
+  confidence: "low" | "medium" | "high" | "very_high";
+  isFallbackEstimate: boolean;
+  fallbackNotes: string | null;
+  source: PredictionSource | null;
+  computedAt: string;
+}
+
+export interface SavedPenPrediction {
+  id: string;
+  nickname: string;
+  request: CreatePredictionBody;
+  result: PredictionResponseDto;
+  savedAt: string;
+}
+
 // ─── Generic API Wrapper ─────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
   success: boolean;
   data: T | null;
-  error: string | null;
-  timestamp: string;
+  error?: {
+    code?: string;
+    message?: string;
+    details?: unknown;
+  } | string | null;
+  requestId?: string;
+  timestamp?: string;
 }
 
 // ─── Mock Config ─────────────────────────────────────────────────────────────

@@ -24,6 +24,8 @@ import { docsRoute } from "./routes/docs";
 import { brandsRoute } from "./routes/brands";
 import { pensRoute } from "./routes/pens";
 import { predictionsRoute } from "./routes/predictions";
+import { authRoute } from "./routes/auth";
+import { adminRoute } from "./routes/admin";
 import type { HonoEnv } from "./types/bindings";
 
 const app = new Hono<HonoEnv>({ strict: false });
@@ -47,6 +49,10 @@ app.route("/api/pens", pensRoute);
 
 // ─── Phase 2: Prediction Engine ───────────────────────────────────────────────
 app.route("/api/predictions", predictionsRoute);
+
+// ─── Phase 3: Auth + Admin ────────────────────────────────────────────────────
+app.route("/api/auth", authRoute);
+app.route("/api/admin", adminRoute);
 
 // ─── 404 fallback ─────────────────────────────────────────────────────────────
 

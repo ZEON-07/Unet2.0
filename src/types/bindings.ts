@@ -18,10 +18,22 @@ export interface Bindings {
   JWT_SECRET: string;
 }
 
+/**
+ * Decoded JWT payload attached to context by jwtAuthMiddleware.
+ */
+export interface JwtPayload {
+  sub: string;    // user id
+  email: string;
+  role: string;   // "user" | "admin"
+  exp: number;
+  iat: number;
+}
+
 /** Hono Variables passed through context */
 export interface Variables {
   requestId: string;
   startTime: number;
+  jwtUser: JwtPayload; // set by jwtAuthMiddleware after successful verification
 }
 
 /** Combined Hono Env type */

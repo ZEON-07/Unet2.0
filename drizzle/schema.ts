@@ -179,19 +179,22 @@ export const predictions = sqliteTable(
   "predictions",
   {
     id: text("id").primaryKey(),
-    penModelId: text("pen_model_id")
-      .notNull()
-      .references(() => penModels.id, { onDelete: "cascade" }),
-    /** Predicted mileage in metres */
+    /** Nullable – null when prediction was made for a manually entered pen not found in DB */
+    penModelId: text("pen_model_id").references(() => penModels.id, {
+      onDelete: "cascade",
+    }),
+    /** Predicted usable writing distance in metres */
     predictedMileageM: real("predicted_mileage_m").notNull(),
     /** "low" | "medium" | "high" | "very_high" */
     confidence: text("confidence", {
       enum: ["low", "medium", "high", "very_high"],
     }).notNull(),
-    /** Semantic version of the prediction model, e.g. "1.0.0" */
+    /** Semantic version of the calculation engine, e.g. "2.0.0" */
     modelVersion: text("model_version").notNull(),
-    /** Number of claims used to generate this prediction */
+    /** Number of community claims used (0 for manufacturer-only estimates) */
     sampleSize: integer("sample_size").notNull().default(0),
+    /** Full serialised prediction request + result DTO (JSON) – used by GET /api/predictions/:id */
+    resultJson: text("result_json"),
     /** Additional model metadata as JSON string */
     metadata: text("metadata"),
     computedAt: text("computed_at").notNull().default(now),
@@ -202,6 +205,7 @@ export const predictions = sqliteTable(
     confidenceIdx: index("predictions_confidence_idx").on(t.confidence),
   })
 );
+
 
 // ─── SearchLookup ─────────────────────────────────────────────────────────────
 

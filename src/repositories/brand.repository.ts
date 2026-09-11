@@ -49,11 +49,11 @@ export async function findBrandByIdOrSlug(db: DrizzleDb, idOrSlug: string) {
     .get();
 }
 
-/** Find a brand by name (case-insensitive prefix match for search filtering). */
-export async function findBrandByNameLike(db: DrizzleDb, namePattern: string) {
+/** Find a brand by name (case-insensitive partial match). */
+export async function findBrandByNameLike(db: DrizzleDb, name: string) {
   return db
     .select()
     .from(penBrands)
-    .where(like(penBrands.name, namePattern))
+    .where(like(penBrands.name, `%${name}%`))
     .get();
 }

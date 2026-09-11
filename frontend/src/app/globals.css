@@ -62,6 +62,27 @@
   }
 }
 
+/* ─── Custom Fountain Pen Nib Cursor ─────────────────────────────────────── */
+
+html, body {
+  cursor: url('/pen-cursor.svg') 0 0, url('/pen-cursor.png') 0 0, auto;
+}
+
+a,
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+.cursor-pointer {
+  cursor: url('/pen-cursor.svg') 0 0, url('/pen-cursor.png') 0 0, pointer !important;
+}
+
+.cursor-pen-nib {
+  cursor: url('/pen-cursor-nib.svg') 0 31, url('/pen-cursor-nib.png') 0 31, auto !important;
+}
+
 /* ─── Paper texture background ──────────────────────────────────────────── */
 
 body {

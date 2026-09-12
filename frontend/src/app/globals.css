@@ -68,6 +68,28 @@ html, body {
   overflow-x: hidden;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  cursor: url('/pen-cursor-32.png') 0 0, url('/pen-cursor.png') 0 0, auto;
+}
+
+/* ─── Custom Pen Cursor for Interactive Elements ──────────────────────────── */
+
+button,
+a,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+.cursor-pointer {
+  cursor: url('/pen-cursor-32.png') 0 0, url('/pen-cursor.png') 0 0, pointer;
+}
+
+/* Text inputs and textareas preserve standard typing cursor */
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+textarea {
+  cursor: text;
 }
 
 /* ─── Laboratory Grid Texture ─────────────────────────────────────────────── */

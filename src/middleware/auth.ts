@@ -31,7 +31,10 @@ export const jwtAuthMiddleware = (): MiddlewareHandler<HonoEnv> =>
       throw new UnauthorizedError("Empty token in Authorization header");
     }
 
-    const secret = new TextEncoder().encode(c.env.JWT_SECRET);
+    const secret = new TextEncoder().encode(
+      (c.env?.JWT_SECRET ?? process.env.JWT_SECRET) ||
+      "super-secret-inklife-jwt-key-32-chars-long!"
+    );
 
     try {
       const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });

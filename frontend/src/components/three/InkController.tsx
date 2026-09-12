@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -22,7 +22,7 @@ export function InkController({
   anchorGeomY,
   initialScaleY = 1.0,
   fillAxis = "y",
-  isDarkAnalysisMode = false,
+  isDarkAnalysisMode: _isDarkAnalysisMode = false,
   colorOverride,
 }: InkControllerProps) {
   // Current smoothly damped scale factor

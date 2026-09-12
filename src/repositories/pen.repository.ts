@@ -1,17 +1,14 @@
 /**
- * Pen repository – D1 queries for pen models with joins.
- *
- * D1/SQLite quirks:
- *  - No array aggregation → we do separate queries for claims/predictions
- *    rather than GROUP BY + JSON_GROUP_ARRAY (poor Workers support)
- *  - LIKE is case-insensitive for ASCII by default in SQLite
- *  - LIMIT/OFFSET for pagination
+ * Pen repository – Prisma queries for pen models with joins.
  */
 
-import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
-import type { DrizzleDb } from "./db";
-import { penBrands, penClaims, penModels, penSources, predictions } from "../../drizzle/schema";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import type { PenSearchQuery } from "../validators/pen.validators";
+
+function getClient(db?: unknown): PrismaClient {
+  return (db && typeof db === "object" && "penModel" in db ? db : prisma) as PrismaClient;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,172 +40,6 @@ export type PredictionRow = {
   computedAt: string;
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Shared select projection joining penModels + penBrands. */
-const modelWithBrandSelect = {
-  id: penModels.id,
-  name: penModels.name,
-  slug: penModels.slug,
-  flowCategory: penModels.flowCategory,
-  barrelVisibility: penModels.barrelVisibility,
-  nominalMileageM: penModels.nominalMileageM,
-  communityMileageM: penModels.communityMileageM,
-  imageUrl: penModels.imageUrl,
-  description: penModels.description,
-  isActive: penModels.isActive,
-  brandId: penModels.brandId,
-  brandName: penBrands.name,
-  brandSlug: penBrands.slug,
-  createdAt: penModels.createdAt,
-  updatedAt: penModels.updatedAt,
-};
-
-// ─── Queries ──────────────────────────────────────────────────────────────────
-
-/**
- * Fetch all active models for a given brand ID, ordered by name.
- */
-export async function findModelsByBrandId(
-  db: DrizzleDb,
-  brandId: string
-): Promise<PenModelRow[]> {
-  return db
-    .select(modelWithBrandSelect)
-    .from(penModels)
-    .innerJoin(penBrands, eq(penModels.brandId, penBrands.id))
-    .where(and(eq(penModels.brandId, brandId), eq(penModels.isActive, true)))
-    .orderBy(asc(penModels.name))
-    .all() as unknown as PenModelRow[];
-}
-
-/**
- * Find a single pen model by its UUID or slug, joined with brand.
- */
-export async function findPenByIdOrSlug(
-  db: DrizzleDb,
-  idOrSlug: string
-): Promise<PenModelRow | undefined> {
-  return db
-    .select(modelWithBrandSelect)
-    .from(penModels)
-    .innerJoin(penBrands, eq(penModels.brandId, penBrands.id))
-    .where(
-      or(eq(penModels.id, idOrSlug), eq(penModels.slug, idOrSlug))
-    )
-    .get() as unknown as PenModelRow | undefined;
-}
-
-/**
- * Search pen models with optional filters and pagination.
- * Returns [rows, totalCount].
- */
-export async function searchPens(
-  db: DrizzleDb,
-  params: PenSearchQuery
-): Promise<{ rows: PenModelRow[]; total: number }> {
-  const { q, brand, inkType, barrelVisibility, page, limit } = params;
-  const offset = (page - 1) * limit;
-
-  // Build WHERE conditions
-  const conditions = [eq(penModels.isActive, true)];
-
-  if (q) {
-    const pattern = `%${q}%`;
-    conditions.push(
-      or(
-        like(penModels.name, pattern),
-        like(penBrands.name, pattern)
-      ) as ReturnType<typeof eq>
-    );
-  }
-
-  if (brand) {
-    const pattern = `%${brand}%`;
-    conditions.push(
-      or(
-        like(penBrands.slug, brand),     // exact slug match
-        like(penBrands.name, pattern)    // partial name match
-      ) as ReturnType<typeof eq>
-    );
-  }
-
-  if (inkType) {
-    conditions.push(eq(penModels.flowCategory, inkType));
-  }
-
-  if (barrelVisibility) {
-    conditions.push(eq(penModels.barrelVisibility, barrelVisibility));
-  }
-
-  const where = and(...conditions);
-
-  // Main paginated query
-  const rows = await db
-    .select(modelWithBrandSelect)
-    .from(penModels)
-    .innerJoin(penBrands, eq(penModels.brandId, penBrands.id))
-    .where(where)
-    .orderBy(asc(penModels.name))
-    .limit(limit)
-    .offset(offset)
-    .all() as PenModelRow[];
-
-  // Count query (separate, D1 doesn't support window COUNT efficiently)
-  const countResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(penModels)
-    .innerJoin(penBrands, eq(penModels.brandId, penBrands.id))
-    .where(where)
-    .get();
-
-  return { rows, total: countResult?.count ?? 0 };
-}
-
-/**
- * Get the latest prediction for a pen model.
- */
-export async function findLatestPrediction(
-  db: DrizzleDb,
-  penModelId: string
-): Promise<PredictionRow | undefined> {
-  return db
-    .select({
-      id: predictions.id,
-      penModelId: predictions.penModelId,
-      predictedMileageM: predictions.predictedMileageM,
-      confidence: predictions.confidence,
-      modelVersion: predictions.modelVersion,
-      sampleSize: predictions.sampleSize,
-      computedAt: predictions.computedAt,
-    })
-    .from(predictions)
-    .where(eq(predictions.penModelId, penModelId))
-    .orderBy(sql`${predictions.computedAt} DESC`)
-    .get() as unknown as PredictionRow | undefined;
-}
-
-/**
- * Find a pen model by brand ID and a fuzzy model name match.
- * Used by the Phase 4 search pipeline to link extracted claims.
- */
-export async function findPenByBrandAndName(
-  db: DrizzleDb,
-  brandId: string,
-  modelName: string
-) {
-  return db
-    .select({ id: penModels.id, name: penModels.name, slug: penModels.slug })
-    .from(penModels)
-    .where(
-      and(
-        eq(penModels.brandId, brandId),
-        like(penModels.name, `%${modelName}%`)
-      )
-    )
-    .get();
-}
-
 export type PenClaimInfo = {
   id: string;
   sourceName: string;
@@ -219,27 +50,238 @@ export type PenClaimInfo = {
   createdAt: string;
 };
 
+// ─── Helper mapping ───────────────────────────────────────────────────────────
+
+function mapModelRow(model: any): PenModelRow {
+  return {
+    id: model.id,
+    name: model.name,
+    slug: model.slug,
+    flowCategory: model.flowCategory ?? "normal_ballpoint",
+    barrelVisibility: model.barrelVisibility ?? "unknown",
+    nominalMileageM: model.nominalMileageM,
+    communityMileageM: model.communityMileageM,
+    imageUrl: model.imageUrl,
+    description: model.description,
+    isActive: model.isActive,
+    brandId: model.brandId,
+    brandName: model.brand?.name ?? "",
+    brandSlug: model.brand?.slug ?? "",
+    createdAt: model.createdAt instanceof Date ? model.createdAt.toISOString() : String(model.createdAt),
+    updatedAt: model.updatedAt instanceof Date ? model.updatedAt.toISOString() : String(model.updatedAt),
+  };
+}
+
+// ─── Queries ──────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all active models for a given brand ID, ordered by name.
+ */
+export async function findModelsByBrandId(
+  db: unknown,
+  brandId?: string
+): Promise<PenModelRow[]> {
+  const actualBrandId = typeof db === "string" ? db : brandId!;
+  const client = getClient(db);
+
+  const rows = await client.penModel.findMany({
+    where: {
+      brandId: actualBrandId,
+      isActive: true,
+    },
+    include: {
+      brand: true,
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
+
+  return rows.map(mapModelRow);
+}
+
+/**
+ * Find a single pen model by its UUID or slug, joined with brand.
+ */
+export async function findPenByIdOrSlug(
+  db: unknown,
+  idOrSlug?: string
+): Promise<PenModelRow | undefined> {
+  const actual = typeof db === "string" ? db : idOrSlug!;
+  const client = getClient(db);
+
+  const model = await client.penModel.findFirst({
+    where: {
+      OR: [{ id: actual }, { slug: actual }],
+    },
+    include: {
+      brand: true,
+    },
+  });
+
+  if (!model) return undefined;
+  return mapModelRow(model);
+}
+
+/**
+ * Search pen models with optional filters and pagination.
+ * Returns { rows, total }.
+ */
+export async function searchPens(
+  db: unknown,
+  params?: PenSearchQuery
+): Promise<{ rows: PenModelRow[]; total: number }> {
+  const actualParams =
+    db && typeof db === "object" && !("penModel" in db)
+      ? (db as PenSearchQuery)
+      : params!;
+  const client = getClient(db);
+
+  const { q, brand, inkType, barrelVisibility, page = 1, limit = 20 } = actualParams || {};
+  const skip = (page - 1) * limit;
+
+  const where: any = {
+    isActive: true,
+  };
+
+  if (q) {
+    where.OR = [
+      { name: { contains: q } },
+      { brand: { name: { contains: q } } },
+    ];
+  }
+
+  if (brand) {
+    where.brand = {
+      OR: [
+        { slug: brand },
+        { name: { contains: brand } },
+      ],
+    };
+  }
+
+  if (inkType) {
+    where.flowCategory = inkType;
+  }
+
+  if (barrelVisibility) {
+    where.barrelVisibility = barrelVisibility;
+  }
+
+  const [rows, total] = await Promise.all([
+    client.penModel.findMany({
+      where,
+      include: {
+        brand: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+      skip,
+      take: limit,
+    }),
+    client.penModel.count({ where }),
+  ]);
+
+  return {
+    rows: rows.map(mapModelRow),
+    total,
+  };
+}
+
+/**
+ * Get the latest prediction for a pen model.
+ */
+export async function findLatestPrediction(
+  db: unknown,
+  penModelId?: string
+): Promise<PredictionRow | undefined> {
+  const actualId = typeof db === "string" ? db : penModelId!;
+  const client = getClient(db);
+
+  const pred = await client.prediction.findFirst({
+    where: {
+      penModelId: actualId,
+    },
+    orderBy: {
+      computedAt: "desc",
+    },
+  });
+
+  if (!pred) return undefined;
+
+  return {
+    id: pred.id,
+    penModelId: pred.penModelId ?? "",
+    predictedMileageM: pred.predictedMileageM,
+    confidence: pred.confidence,
+    modelVersion: pred.modelVersion,
+    sampleSize: pred.sampleSize,
+    computedAt:
+      pred.computedAt instanceof Date
+        ? pred.computedAt.toISOString()
+        : String(pred.computedAt),
+  };
+}
+
+/**
+ * Find a pen model by brand ID and a fuzzy model name match.
+ */
+export async function findPenByBrandAndName(
+  db: unknown,
+  brandId: string,
+  modelName?: string
+) {
+  const actualModelName = typeof brandId === "string" && modelName ? modelName : "";
+  const actualBrandId = brandId;
+  const client = getClient(db);
+
+  return client.penModel.findFirst({
+    where: {
+      brandId: actualBrandId,
+      name: {
+        contains: actualModelName,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+  });
+}
+
 /**
  * Fetch all claims associated with a pen model, ordered by verified status then recency.
  */
 export async function findClaimsForPenModel(
-  db: DrizzleDb,
-  penModelId: string
+  db: unknown,
+  penModelId?: string
 ): Promise<PenClaimInfo[]> {
-  return db
-    .select({
-      id: penClaims.id,
-      sourceName: penSources.name,
-      sourceUrl: penSources.url,
-      mileageClaimed: penClaims.mileageClaimed,
-      isVerified: penClaims.isVerified,
-      notes: penClaims.notes,
-      createdAt: penClaims.createdAt,
-    })
-    .from(penClaims)
-    .innerJoin(penSources, eq(penClaims.sourceId, penSources.id))
-    .where(eq(penClaims.penModelId, penModelId))
-    .orderBy(desc(penClaims.isVerified), desc(penClaims.createdAt))
-    .all() as unknown as PenClaimInfo[];
-}
+  const actualId = typeof db === "string" ? db : penModelId!;
+  const client = getClient(db);
 
+  const claims = await client.penClaim.findMany({
+    where: {
+      penModelId: actualId,
+    },
+    include: {
+      source: true,
+    },
+    orderBy: [
+      { isVerified: "desc" },
+      { createdAt: "desc" },
+    ],
+  });
+
+  return claims.map((c) => ({
+    id: c.id,
+    sourceName: c.source?.name ?? "Unknown Source",
+    sourceUrl: c.source?.url ?? null,
+    mileageClaimed: c.mileageClaimed ?? 0,
+    isVerified: c.isVerified,
+    notes: c.notes,
+    createdAt:
+      c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+  }));
+}

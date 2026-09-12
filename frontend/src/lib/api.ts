@@ -11,48 +11,134 @@ import type {
 } from "@/types";
 import { mockApi } from "@/lib/mock-api";
 
+// ─── API Error and Envelope Definitions ──────────────────────────────────────
+
+export class ApiError extends Error {
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, status: number, details?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.details = details;
+  }
+}
+
+export interface ApiEnvelope<T> {
+  success: boolean;
+  data?: T | null;
+  error?:
+    | string
+    | {
+        message?: string;
+        code?: string;
+        details?: unknown;
+      }
+    | null;
+  requestId?: string;
+  timestamp?: string;
+  meta?: unknown;
+  pagination?: unknown;
+}
+
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
-const USE_MOCK =
-  process.env.NEXT_PUBLIC_USE_MOCK_API === "true";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
 
 // ─── Fetch wrapper ───────────────────────────────────────────────────────────
 
-async function apiFetch<T>(
+export interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+export async function apiFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestOptions = {}
 ): Promise<ApiResponse<T>> {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${API_URL}${cleanPath}`;
+  const timeoutMs = options.timeoutMs ?? 25000;
+
+  // Set up abort signal with timeout to handle Render cold starts gracefully
+  const controller = new AbortController();
+
+  if (options.signal) {
+    options.signal.addEventListener("abort", () => controller.abort());
+  }
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (options.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
   try {
-    const res = await fetch(`${API_URL}${path}`, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+    const res = await fetch(url, {
       ...options,
+      headers,
+      signal: controller.signal,
     });
 
-    const json = await res.json().catch(() => null);
+    clearTimeout(timeoutId);
+
+    // Parse JSON or handle non-JSON responses (e.g. Render cold start HTML 502/503/504)
+    let json: Record<string, unknown> | null = null;
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    } else {
+      const text = await res.text().catch(() => "");
+      if (!res.ok) {
+        return {
+          success: false,
+          data: null,
+          error:
+            res.status === 502 || res.status === 503 || res.status === 504
+              ? "The prediction service is starting or temporarily unavailable. Please try again."
+              : `Server returned status ${res.status}: ${text.slice(0, 100) || res.statusText}`,
+          timestamp: new Date().toISOString(),
+        };
+      }
+    }
 
     if (!res.ok) {
       const errorMsg =
-        (json && typeof json.error === "object" ? json.error.message : null) ||
+        (json && typeof json.error === "object" && json.error !== null
+          ? (json.error as { message?: string }).message
+          : null) ||
         (json && typeof json.error === "string" ? json.error : null) ||
-        `API error: ${res.status} ${res.statusText}`;
+        (res.status === 502 || res.status === 503 || res.status === 504
+          ? "The prediction service is starting or temporarily unavailable. Please try again."
+          : `API error: ${res.status} ${res.statusText}`);
 
       return {
         success: false,
         data: null,
         error: errorMsg,
-        requestId: json?.requestId,
+        requestId: typeof json?.requestId === "string" ? json.requestId : undefined,
         timestamp: new Date().toISOString(),
       };
     }
 
-    return json as ApiResponse<T>;
+    return json as unknown as ApiResponse<T>;
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Network error";
+    clearTimeout(timeoutId);
+
+    const isAbort = err instanceof Error && err.name === "AbortError";
+    const message = isAbort
+      ? "The prediction service is starting or temporarily unavailable. Please try again."
+      : err instanceof Error
+      ? err.message
+      : "Network error";
+
     return {
       success: false,
       data: null,
@@ -64,7 +150,7 @@ async function apiFetch<T>(
 
 // ─── Fallback helper ─────────────────────────────────────────────────────────
 
-let _mockFallbackActive = false;
+const _mockFallbackActive = false;
 
 export function isMockFallbackActive(): boolean {
   return _mockFallbackActive;
@@ -112,10 +198,23 @@ export async function getPens(params?: {
   if (params?.limit) searchParams.append("limit", params.limit.toString());
 
   const query = searchParams.toString();
-  const res = await apiFetch<any>(`/api/pens${query ? `?${query}` : ""}`);
+  interface PenApiItem {
+    id: string;
+    name: string;
+    slug: string;
+    flowCategory: string;
+    tipSizeMm?: number | null;
+    nominalMileageM?: number | null;
+    brand?: { id: string; name: string; slug: string };
+    brandId?: string;
+    brandName?: string;
+    brandSlug?: string;
+  }
+
+  const res = await apiFetch<PenApiItem[]>(`/api/pens${query ? `?${query}` : ""}`);
 
   if (res.success && Array.isArray(res.data)) {
-    const mapped: PenModel[] = res.data.map((pen: any) => ({
+    const mapped: PenModel[] = res.data.map((pen: PenApiItem) => ({
       id: pen.id,
       name: pen.name,
       slug: pen.slug,

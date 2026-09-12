@@ -14,6 +14,7 @@ import {
 } from "./prediction.engine";
 import type { CreatePredictionBody } from "../validators/prediction.validators";
 import { NotFoundError, ValidationError } from "../utils/errors";
+import { parseJson } from "../lib/prisma";
 
 // ─── Response DTO ─────────────────────────────────────────────────────────────
 
@@ -197,5 +198,5 @@ export async function getPrediction(
     throw new ValidationError("Prediction record is missing result data");
   }
 
-  return JSON.parse(row.resultJson) as PredictionResponseDto;
+  return parseJson<PredictionResponseDto>(row.resultJson, {} as PredictionResponseDto);
 }

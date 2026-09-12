@@ -138,6 +138,7 @@ export default function HomePage() {
   };
 
   const handleCalculate = async () => {
+    if (calculating) return;
     setErrorMsg(null);
 
     // Use exact current slider percentage
@@ -176,10 +177,18 @@ export default function HomePage() {
           document.getElementById("results")?.scrollIntoView({ behavior: "smooth" });
         }, 150);
       } else {
-        setErrorMsg(typeof res.error === "string" ? res.error : "Calculation failed.");
+        const fallbackMsg =
+          "The prediction service is starting or temporarily unavailable. Please try again.";
+        setErrorMsg(
+          typeof res.error === "string"
+            ? res.error
+            : typeof res.error === "object" && res.error?.message
+            ? res.error.message
+            : fallbackMsg
+        );
       }
     } catch {
-      setErrorMsg("Error communicating with backend service.");
+      setErrorMsg("The prediction service is starting or temporarily unavailable. Please try again.");
     } finally {
       setCalculating(false);
     }
@@ -695,7 +704,7 @@ export default function HomePage() {
             {calculating ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>COMPUTING PHYSICAL ESTIMATE...</span>
+                <span>Calculating…</span>
               </>
             ) : (
               <>

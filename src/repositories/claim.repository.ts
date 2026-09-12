@@ -2,9 +2,12 @@
  * Claim repository – pending claim queries for the admin panel.
  */
 
-import { desc, eq } from "drizzle-orm";
-import type { DrizzleDb } from "./db";
-import { penClaims, penModels, penBrands, penSources, users } from "../../drizzle/schema";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
+
+function getClient(db?: unknown): PrismaClient {
+  return (db && typeof db === "object" && "penClaim" in db ? db : prisma) as PrismaClient;
+}
 
 export type PendingClaimRow = {
   id: string;
@@ -28,64 +31,75 @@ export type PendingClaimRow = {
 /**
  * Fetch all unverified claims joined with pen model, brand, user, and source info.
  */
-export async function findPendingClaims(db: DrizzleDb): Promise<PendingClaimRow[]> {
-  const rows = await db
-    .select({
-      id: penClaims.id,
-      penModelId: penClaims.penModelId,
-      penModelName: penModels.name,
-      brandName: penBrands.name,
-      userId: penClaims.userId,
-      userEmail: users.email,
-      sourceId: penClaims.sourceId,
-      sourceName: penSources.name,
-      sourceUrl: penSources.url,
-      purchasedAt: penClaims.purchasedAt,
-      mileageClaimed: penClaims.mileageClaimed,
-      inkFlowRating: penClaims.inkFlowRating,
-      notes: penClaims.notes,
-      isVerified: penClaims.isVerified,
-      createdAt: penClaims.createdAt,
-      updatedAt: penClaims.updatedAt,
-    })
-    .from(penClaims)
-    .innerJoin(penModels, eq(penClaims.penModelId, penModels.id))
-    .innerJoin(penBrands, eq(penModels.brandId, penBrands.id))
-    .innerJoin(users, eq(penClaims.userId, users.id))
-    .leftJoin(penSources, eq(penClaims.sourceId, penSources.id))
-    .where(eq(penClaims.isVerified, false))
-    .orderBy(desc(penClaims.createdAt))
-    .all() as unknown as PendingClaimRow[];
+export async function findPendingClaims(db?: unknown): Promise<PendingClaimRow[]> {
+  const client = getClient(db);
 
-  return rows;
+  const claims = await client.penClaim.findMany({
+    where: {
+      isVerified: false,
+    },
+    include: {
+      penModel: {
+        include: {
+          brand: true,
+        },
+      },
+      user: true,
+      source: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  return claims.map((c) => ({
+    id: c.id,
+    penModelId: c.penModelId,
+    penModelName: c.penModel?.name ?? "",
+    brandName: c.penModel?.brand?.name ?? "",
+    userId: c.userId,
+    userEmail: c.user?.email ?? "",
+    sourceId: c.sourceId,
+    sourceName: c.source?.name ?? null,
+    sourceUrl: c.source?.url ?? null,
+    purchasedAt: c.purchasedAt,
+    mileageClaimed: c.mileageClaimed,
+    inkFlowRating: c.inkFlowRating,
+    notes: c.notes,
+    isVerified: c.isVerified,
+    createdAt:
+      c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+    updatedAt:
+      c.updatedAt instanceof Date ? c.updatedAt.toISOString() : String(c.updatedAt),
+  }));
 }
 
 /** Find a single claim by its UUID. */
-export async function findClaimById(db: DrizzleDb, id: string) {
-  return db
-    .select()
-    .from(penClaims)
-    .where(eq(penClaims.id, id))
-    .get();
+export async function findClaimById(db: unknown, id?: string) {
+  const actualId = typeof db === "string" ? db : id!;
+  const client = getClient(db);
+  return client.penClaim.findUnique({
+    where: { id: actualId },
+  });
 }
 
 /**
  * Update a claim's isVerified status and optionally its notes.
  */
 export async function updateClaim(
-  db: DrizzleDb,
+  db: unknown,
   id: string,
-  patch: { isVerified: boolean; notes?: string }
+  patch?: { isVerified: boolean; notes?: string }
 ) {
-  const updatedAt = new Date().toISOString();
-  return db
-    .update(penClaims)
-    .set({
-      isVerified: patch.isVerified,
-      ...(patch.notes !== undefined && { notes: patch.notes }),
-      updatedAt,
-    })
-    .where(eq(penClaims.id, id))
-    .returning()
-    .get();
+  const actualId = typeof db === "string" && !patch ? db : id;
+  const actualPatch = typeof db === "string" && !patch ? (id as any) : patch!;
+  const client = getClient(db);
+
+  return client.penClaim.update({
+    where: { id: actualId },
+    data: {
+      isVerified: actualPatch.isVerified,
+      ...(actualPatch.notes !== undefined && { notes: actualPatch.notes }),
+    },
+  });
 }

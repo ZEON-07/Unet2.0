@@ -1,114 +1,58 @@
 /**
- * InkLife API – Cloudflare Worker Entry Point
+ * InkLife Backend Entry Point
  *
- * Middleware registration order (outermost → innermost):
- *   1. Secure headers    – set security headers on every response
- *   2. CORS              – handle preflight + add CORS headers
- *   3. Request ID        – inject X-Request-Id + record start time
- *   4. Logger            – structured JSON log after response
- *   5. Rate limiter      – KV sliding-window, 60 req/60s per IP
- *   ─── route handlers ───
- *   6. Error handler     – registered via app.onError()
+ * Runs on Node.js Fastify with SQLite & Prisma ORM.
+ *
+ * Local database: DATABASE_URL="file:./dev.db"
+ * Coolify production: DATABASE_URL="file:/app/data/inklife.db"
+ *
+ * Required backend replicas: 1
  */
 
-import { Hono } from "hono";
-import { validateEnv } from "./config/env";
-import { secureHeadersMiddleware } from "./middleware/secureHeaders";
-import { corsMiddleware } from "./middleware/cors";
-import { requestIdMiddleware } from "./middleware/requestId";
-import { loggerMiddleware } from "./middleware/logger";
-import { rateLimitMiddleware } from "./middleware/rateLimit";
-import { errorHandler } from "./middleware/errorHandler";
-import { healthRoute } from "./routes/health";
-import { docsRoute } from "./routes/docs";
-import { brandsRoute } from "./routes/brands";
-import { pensRoute } from "./routes/pens";
-import { predictionsRoute } from "./routes/predictions";
-import { authRoute } from "./routes/auth";
-import { adminRoute } from "./routes/admin";
-import { searchLookupsRoute } from "./routes/searchLookups";
-import type { HonoEnv } from "./types/bindings";
+import "dotenv/config";
+import { buildServer } from "./server";
+import { configureSqlitePragmas, prisma } from "./lib/prisma";
 
-const app = new Hono<HonoEnv>({ strict: false });
+const rawPort = process.env.PORT || "3001";
+const PORT = Number(rawPort);
+if (!Number.isFinite(PORT) || PORT <= 0 || PORT > 65535) {
+  console.error(`[Startup Error] Invalid PORT configuration: "${rawPort}". Port must be a number between 1 and 65535.`);
+  process.exit(1);
+}
+const HOST = process.env.HOST || "0.0.0.0";
 
-// ─── Global middleware ────────────────────────────────────────────────────────
+async function start() {
+  try {
+    // 1. Safe SQLite startup configuration
+    await configureSqlitePragmas(prisma);
 
-app.use("*", secureHeadersMiddleware());
-app.use("*", corsMiddleware());
-app.use("*", requestIdMiddleware());
-app.use("*", loggerMiddleware());
-app.use("*", rateLimitMiddleware());
+    // 2. Build Fastify server
+    const app = await buildServer();
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+    // 3. Start listening
+    await app.listen({ port: PORT, host: HOST });
 
-app.route("/api/health", healthRoute);
-app.route("/api/docs", docsRoute);
-app.get("/openapi.json", (c) => c.redirect("/api/docs/openapi.json"));
+    console.log("──────────────────────────────────────────────────");
+    console.log(`🚀 InkLife Backend running on http://${HOST}:${PORT}`);
+    console.log(`📦 Database: ${process.env.DATABASE_URL || "file:./dev.db"}`);
+    console.log("🔒 SQLite WAL mode enabled, foreign keys ON");
+    console.log("⚡ Required backend replicas: 1 (Single instance)");
+    console.log("──────────────────────────────────────────────────");
 
-// ─── Phase 1: Public Read APIs ────────────────────────────────────────────────
-app.route("/api/brands", brandsRoute);
-app.route("/api/pens", pensRoute);
-
-// ─── Phase 2: Prediction Engine ───────────────────────────────────────────────
-app.route("/api/predictions", predictionsRoute);
-
-// ─── Phase 3: Auth + Admin ────────────────────────────────────────────────────
-app.route("/api/auth", authRoute);
-app.route("/api/admin", adminRoute);
-
-// ─── Phase 4: Web-Search Lookup Pipeline ───────────────────────────────────────
-app.route("/api/search-lookups", searchLookupsRoute);
-
-// ─── 404 fallback ─────────────────────────────────────────────────────────────
-
-app.notFound((c) => {
-  const requestId = c.get("requestId") ?? "unknown";
-  return c.json(
-    {
-      success: false,
-      error: {
-        code: "NOT_FOUND",
-        message: `Route ${c.req.method} ${new URL(c.req.url).pathname} not found`,
-      },
-      requestId,
-      timestamp: new Date().toISOString(),
-    },
-    404
-  );
-});
-
-// ─── Central error handler ────────────────────────────────────────────────────
-
-app.onError(errorHandler);
-
-// ─── Worker export ────────────────────────────────────────────────────────────
-
-export default {
-  async fetch(
-    request: Request,
-    env: HonoEnv["Bindings"],
-    ctx: ExecutionContext
-  ): Promise<Response> {
-    // Validate required env vars at runtime (fails fast on misconfiguration)
-    try {
-      validateEnv(env);
-    } catch (err) {
-      console.error(JSON.stringify({ level: "error", error: String(err) }));
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            code: "CONFIGURATION_ERROR",
-            message: "Server is misconfigured. Check worker environment variables.",
-          },
-        }),
-        {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    // 4. Graceful shutdown
+    const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM"];
+    for (const signal of signals) {
+      process.on(signal, async () => {
+        console.log(`\nReceived ${signal}, shutting down gracefully...`);
+        await app.close();
+        await prisma.$disconnect();
+        process.exit(0);
+      });
     }
+  } catch (err) {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  }
+}
 
-    return app.fetch(request, env, ctx);
-  },
-} satisfies ExportedHandler<HonoEnv["Bindings"]>;
+start();

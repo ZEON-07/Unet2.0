@@ -1,0 +1,143 @@
+// InkLife Prisma Schema - SQLite Hackathon & Production Deployment
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  name          String
+  role          String          @default("user") // "user" | "admin"
+  passwordHash  String?
+  emailVerified Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  claims        PenClaim[]
+  auditLogs     AdminAuditLog[]
+
+  @@map("users")
+}
+
+model PenBrand {
+  id              String     @id @default(cuid())
+  name            String
+  slug            String     @unique
+  logoUrl         String?
+  countryOfOrigin String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  models          PenModel[]
+
+  @@map("pen_brands")
+}
+
+model PenModel {
+  id                String         @id @default(cuid())
+  brandId           String
+  brand             PenBrand       @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  name              String
+  slug              String         @unique
+  inkType           String?
+  barrelVisibility  String         @default("unknown")
+  flowCategory      String?
+  nominalMileageM   Float?
+  communityMileageM Float?
+  imageUrl          String?
+  description       String?
+  isActive          Boolean        @default(true)
+  isVerified        Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  claims            PenClaim[]
+  predictions       Prediction[]
+  searchLookups     SearchLookup[]
+
+  @@map("pen_models")
+}
+
+model PenSource {
+  id          String     @id @default(cuid())
+  sourceType  String // "online" | "offline" | "hybrid"
+  name        String
+  url         String?
+  countryCode String?
+  isVerified  Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  claims      PenClaim[]
+
+  @@map("pen_sources")
+}
+
+model PenClaim {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  penModelId     String
+  penModel       PenModel   @relation(fields: [penModelId], references: [id], onDelete: Restrict)
+  sourceId       String?
+  source         PenSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  purchasedAt    String?
+  mileageClaimed Float?
+  inkFlowRating  Int?
+  notes          String?
+  isVerified     Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@map("pen_claims")
+}
+
+model Prediction {
+  id                String    @id @default(cuid())
+  penModelId        String?
+  penModel          PenModel? @relation(fields: [penModelId], references: [id], onDelete: Cascade)
+  predictedMileageM Float
+  confidence        String // "low" | "medium" | "high" | "very_high"
+  modelVersion      String
+  sampleSize        Int       @default(0)
+  resultJson        String?
+  metadata          String?
+  computedAt        DateTime  @default(now())
+
+  @@map("predictions")
+}
+
+model SearchLookup {
+  id                   String    @id @default(cuid())
+  query                String
+  penModelId           String?
+  penModel             PenModel? @relation(fields: [penModelId], references: [id], onDelete: SetNull)
+  resultCount          Int       @default(0)
+  clientIpHash         String?
+  searchedAt           DateTime  @default(now())
+  status               String    @default("completed") // "pending" | "completed" | "failed" | "cached"
+  rawResult            String?
+  pendingClaimsCreated Int       @default(0)
+  brand                String?
+  model                String?
+  cacheHit             Boolean   @default(false)
+  message              String?
+
+  @@map("search_lookups")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminUserId String
+  adminUser   User     @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+  action      String
+  targetType  String
+  targetId    String?
+  metadata    String?
+  clientIp    String?
+  createdAt   DateTime @default(now())
+
+  @@map("admin_audit_logs")
+}

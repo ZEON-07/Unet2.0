@@ -1,14 +1,16 @@
 /**
- * Search lookup repository – Phase 4 extended version.
+ * Search lookup repository – Prisma version.
  *
  * Handles both the admin list view (GET /api/admin/search-lookups)
  * and the Phase 4 pipeline (insert + update).
  */
 
-import { desc, eq, sql } from "drizzle-orm";
-import type { DrizzleDb } from "./db";
-import { searchLookups, penModels, penBrands } from "../../drizzle/schema";
-import type { NewSearchLookup } from "../../drizzle/schema";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
+
+function getClient(db?: unknown): PrismaClient {
+  return (db && typeof db === "object" && "searchLookup" in db ? db : prisma) as PrismaClient;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,24 +35,26 @@ export type SearchLookupRow = {
 
 /**
  * Create a new search lookup record.
- * Call this before hitting the provider so the record exists even if the
- * provider throws (we can update it to status = 'failed').
  */
 export async function insertSearchLookup(
-  db: DrizzleDb,
-  data: Omit<NewSearchLookup, "searchedAt">
+  db: unknown,
+  data?: any
 ) {
-  return db.insert(searchLookups).values(data).returning().get();
+  const payload = typeof db === "object" && data === undefined ? db : data;
+  const client = getClient(db);
+  return client.searchLookup.create({
+    data: payload,
+  });
 }
 
 /**
  * Update a search lookup record after the pipeline completes.
  */
 export async function updateSearchLookup(
-  db: DrizzleDb,
+  db: unknown,
   id: string,
-  patch: {
-    status?: "completed" | "failed" | "cached";
+  patch?: {
+    status?: string;
     resultCount?: number;
     rawResult?: string;
     pendingClaimsCreated?: number;
@@ -58,20 +62,22 @@ export async function updateSearchLookup(
     message?: string;
   }
 ) {
-  return db
-    .update(searchLookups)
-    .set(patch)
-    .where(eq(searchLookups.id, id))
-    .returning()
-    .get();
+  const actualId = typeof db === "string" && !patch ? db : id;
+  const actualPatch = typeof db === "string" && !patch ? (id as any) : patch!;
+  const client = getClient(db);
+
+  return client.searchLookup.update({
+    where: { id: actualId },
+    data: actualPatch,
+  });
 }
 
 // ─── Cache helpers ────────────────────────────────────────────────────────────
 
-/** 30-day TTL in seconds for the KV search cache */
+/** 30-day TTL in seconds for the search cache */
 export const SEARCH_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-/** Build the KV cache key from a normalized query string */
+/** Build the cache key from a normalized query string */
 export function buildCacheKey(normalizedQuery: string): string {
   return `search_cache:${normalizedQuery}`;
 }
@@ -82,39 +88,47 @@ export function buildCacheKey(normalizedQuery: string): string {
  * Paginated list of search lookup records with joined pen model / brand names.
  */
 export async function listSearchLookups(
-  db: DrizzleDb,
-  limit: number,
-  offset: number
+  db: unknown,
+  limit = 20,
+  offset = 0
 ): Promise<{ rows: SearchLookupRow[]; total: number }> {
-  const rows = await db
-    .select({
-      id: searchLookups.id,
-      query: searchLookups.query,
-      penModelId: searchLookups.penModelId,
-      penModelName: penModels.name,
-      brandName: penBrands.name,
-      resultCount: searchLookups.resultCount,
-      clientIpHash: searchLookups.clientIpHash,
-      searchedAt: searchLookups.searchedAt,
-      status: searchLookups.status,
-      pendingClaimsCreated: searchLookups.pendingClaimsCreated,
-      brand: searchLookups.brand,
-      model: searchLookups.model,
-      cacheHit: searchLookups.cacheHit,
-      message: searchLookups.message,
-    })
-    .from(searchLookups)
-    .leftJoin(penModels, eq(searchLookups.penModelId, penModels.id))
-    .leftJoin(penBrands, eq(penModels.brandId, penBrands.id))
-    .orderBy(desc(searchLookups.searchedAt))
-    .limit(limit)
-    .offset(offset)
-    .all() as unknown as SearchLookupRow[];
+  const client = getClient(db);
 
-  const countResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(searchLookups)
-    .get();
+  const [lookups, total] = await Promise.all([
+    client.searchLookup.findMany({
+      include: {
+        penModel: {
+          include: {
+            brand: true,
+          },
+        },
+      },
+      orderBy: {
+        searchedAt: "desc",
+      },
+      skip: offset,
+      take: limit,
+    }),
+    client.searchLookup.count(),
+  ]);
 
-  return { rows, total: countResult?.count ?? 0 };
+  const rows: SearchLookupRow[] = lookups.map((l) => ({
+    id: l.id,
+    query: l.query,
+    penModelId: l.penModelId,
+    penModelName: l.penModel?.name ?? null,
+    brandName: l.penModel?.brand?.name ?? null,
+    resultCount: l.resultCount,
+    clientIpHash: l.clientIpHash,
+    searchedAt:
+      l.searchedAt instanceof Date ? l.searchedAt.toISOString() : String(l.searchedAt),
+    status: l.status,
+    pendingClaimsCreated: l.pendingClaimsCreated,
+    brand: l.brand,
+    model: l.model,
+    cacheHit: l.cacheHit,
+    message: l.message,
+  }));
+
+  return { rows, total };
 }

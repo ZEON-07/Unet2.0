@@ -3,12 +3,10 @@
  * This type is used throughout the app via Hono's Env generic.
  */
 export interface Bindings {
-  // Cloudflare D1 Database
-  DB: D1Database;
-
-  // Cloudflare KV namespaces
-  RATE_LIMIT_KV: KVNamespace;   // sliding-window rate limiter
-  SEARCH_CACHE_KV: KVNamespace; // 30-day search result cache (Phase 4)
+  // Database & Cache bindings (optional / fallback in Node.js)
+  DB?: any;
+  RATE_LIMIT_KV?: any;
+  SEARCH_CACHE_KV?: any;
 
   // Environment variables (non-secret)
   ENVIRONMENT: "development" | "staging" | "production";

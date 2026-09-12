@@ -1,30 +1,36 @@
 /**
- * Prediction repository – D1 persistence for prediction records.
+ * Prediction repository – Prisma persistence for prediction records.
  */
 
-import { desc, eq } from "drizzle-orm";
-import type { DrizzleDb } from "./db";
-import { penClaims, penSources, predictions } from "../../drizzle/schema";
-import type { NewPrediction } from "../../drizzle/schema";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
+
+function getClient(db?: unknown): PrismaClient {
+  return (db && typeof db === "object" && "prediction" in db ? db : prisma) as PrismaClient;
+}
 
 /** Insert a new prediction row and return the full record. */
 export async function insertPrediction(
-  db: DrizzleDb,
-  data: NewPrediction
+  db: unknown,
+  data?: any
 ) {
-  return db.insert(predictions).values(data).returning().get();
+  const payload = typeof db === "object" && data === undefined ? db : data;
+  const client = getClient(db);
+  return client.prediction.create({
+    data: payload,
+  });
 }
 
 /** Fetch a prediction by its UUID. */
 export async function findPredictionById(
-  db: DrizzleDb,
-  id: string
+  db: unknown,
+  id?: string
 ) {
-  return db
-    .select()
-    .from(predictions)
-    .where(eq(predictions.id, id))
-    .get();
+  const actualId = typeof db === "string" ? db : id!;
+  const client = getClient(db);
+  return client.prediction.findUnique({
+    where: { id: actualId },
+  });
 }
 
 /**
@@ -33,20 +39,34 @@ export async function findPredictionById(
  * returning the source title, url, and the claim's createdAt as checkedAt.
  */
 export async function findSourceForPenModel(
-  db: DrizzleDb,
-  penModelId: string
+  db: unknown,
+  penModelId?: string
 ): Promise<{ title: string; url: string | null; checkedAt: string } | null> {
-  const row = await db
-    .select({
-      title: penSources.name,
-      url: penSources.url,
-      checkedAt: penClaims.createdAt,
-    })
-    .from(penClaims)
-    .innerJoin(penSources, eq(penClaims.sourceId, penSources.id))
-    .where(eq(penClaims.penModelId, penModelId))
-    .orderBy(desc(penClaims.isVerified), desc(penClaims.createdAt))
-    .get();
+  const actualId = typeof db === "string" ? db : penModelId!;
+  const client = getClient(db);
 
-  return row ?? null;
+  const claim = await client.penClaim.findFirst({
+    where: {
+      penModelId: actualId,
+      sourceId: { not: null },
+    },
+    include: {
+      source: true,
+    },
+    orderBy: [
+      { isVerified: "desc" },
+      { createdAt: "desc" },
+    ],
+  });
+
+  if (!claim || !claim.source) return null;
+
+  return {
+    title: claim.source.name,
+    url: claim.source.url,
+    checkedAt:
+      claim.createdAt instanceof Date
+        ? claim.createdAt.toISOString()
+        : String(claim.createdAt),
+  };
 }

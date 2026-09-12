@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ─── Common field validators ─────────────────────────────────────────────────
 
-export const idSchema = z.string().uuid("ID must be a valid UUID");
+export const idSchema = z.string().min(1, "ID is required");
 
 export const slugSchema = z
   .string()
@@ -17,35 +17,56 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
+// ─── Required Zod Enums for SQLite ───────────────────────────────────────────
 
-export const FlowCategoryEnum = z.enum([
-  "normal_ballpoint",
-  "liquid_rollerball",
-  "smooth_low_viscosity",
-  "gel",
-  "fiber_tip",
-  "felt_tip",
+export const confidenceSchema = z.enum([
+  "high",
+  "medium",
+  "low",
+  "very_high",
 ]);
 
-export const BarrelVisibilityEnum = z.enum([
+export const writingStyleSchema = z.enum([
+  "light",
+  "normal",
+  "heavy",
+]);
+
+export const notebookTypeSchema = z.enum([
+  "long_book",
+  "queen_book",
+  "king_book",
+]);
+
+export const barrelVisibilitySchema = z.enum([
   "transparent",
   "visible_refill",
   "opaque",
   "semi_transparent",
+  "unknown",
 ]);
 
+export const flowCategorySchema = z.enum([
+  "low_flow",
+  "normal_ballpoint",
+  "smooth_low_viscosity",
+  "gel",
+  "liquid_rollerball",
+  "fiber_tip",
+  "felt_tip",
+]);
+
+export const FlowCategoryEnum = flowCategorySchema;
+export const BarrelVisibilityEnum = barrelVisibilitySchema;
+export const ConfidenceEnum = confidenceSchema;
 export const SourceTypeEnum = z.enum(["online", "offline", "hybrid"]);
-
-export const ConfidenceEnum = z.enum(["low", "medium", "high", "very_high"]);
-
 export const UserRoleEnum = z.enum(["user", "admin"]);
 
 // ─── TypeScript types derived from Zod ───────────────────────────────────────
 
-export type FlowCategory = z.infer<typeof FlowCategoryEnum>;
-export type BarrelVisibility = z.infer<typeof BarrelVisibilityEnum>;
+export type FlowCategory = z.infer<typeof flowCategorySchema>;
+export type BarrelVisibility = z.infer<typeof barrelVisibilitySchema>;
 export type SourceType = z.infer<typeof SourceTypeEnum>;
-export type Confidence = z.infer<typeof ConfidenceEnum>;
+export type Confidence = z.infer<typeof confidenceSchema>;
 export type UserRole = z.infer<typeof UserRoleEnum>;
 export type Pagination = z.infer<typeof paginationSchema>;

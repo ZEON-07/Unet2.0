@@ -1,63 +1,80 @@
 /**
  * PenModel repository.
  * All DB access for pen brands and models lives here.
- * Business logic belongs in src/services/.
  */
 
-import { eq, and } from "drizzle-orm";
-import type { DrizzleDb } from "./db";
-import { penBrands, penModels } from "../../drizzle/schema";
-import type { NewPenBrand, NewPenModel } from "../../drizzle/schema";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
+
+function getClient(db?: unknown): PrismaClient {
+  return (db && typeof db === "object" && "penModel" in db ? db : prisma) as PrismaClient;
+}
 
 // ── Brands ────────────────────────────────────────────────────────────────────
 
-export async function findAllBrands(db: DrizzleDb) {
-  return db.select().from(penBrands).all();
+export async function findAllBrands(db?: unknown) {
+  const client = getClient(db);
+  return client.penBrand.findMany({
+    orderBy: { name: "asc" },
+  });
 }
 
-export async function findBrandBySlug(db: DrizzleDb, slug: string) {
-  return db
-    .select()
-    .from(penBrands)
-    .where(eq(penBrands.slug, slug))
-    .get();
+export async function findBrandBySlug(db: unknown, slug?: string) {
+  const actualSlug = typeof db === "string" ? db : slug!;
+  const client = getClient(db);
+  return client.penBrand.findUnique({
+    where: { slug: actualSlug },
+  });
 }
 
-export async function insertBrand(db: DrizzleDb, data: NewPenBrand) {
-  return db.insert(penBrands).values(data).returning().get();
+export async function insertBrand(db: unknown, data?: any) {
+  const payload = typeof db === "object" && data === undefined ? db : data;
+  const client = getClient(db);
+  return client.penBrand.create({
+    data: payload,
+  });
 }
 
 // ── Models ────────────────────────────────────────────────────────────────────
 
 export async function findAllModels(
-  db: DrizzleDb,
+  db?: unknown,
   filters?: { brandId?: string; flowCategory?: string }
 ) {
-  const conditions = [];
-  if (filters?.brandId) conditions.push(eq(penModels.brandId, filters.brandId));
-  if (filters?.flowCategory)
-    conditions.push(eq(penModels.flowCategory, filters.flowCategory as never));
+  const actualFilters =
+    db && typeof db === "object" && !("penModel" in db) ? (db as any) : filters;
+  const client = getClient(db);
 
-  const query = db
-    .select()
-    .from(penModels)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
+  const where: any = {};
+  if (actualFilters?.brandId) where.brandId = actualFilters.brandId;
+  if (actualFilters?.flowCategory) where.flowCategory = actualFilters.flowCategory;
 
-  return query.all();
+  return client.penModel.findMany({
+    where,
+    orderBy: { name: "asc" },
+  });
 }
 
-export async function findModelBySlug(db: DrizzleDb, slug: string) {
-  return db
-    .select()
-    .from(penModels)
-    .where(eq(penModels.slug, slug))
-    .get();
+export async function findModelBySlug(db: unknown, slug?: string) {
+  const actualSlug = typeof db === "string" ? db : slug!;
+  const client = getClient(db);
+  return client.penModel.findUnique({
+    where: { slug: actualSlug },
+  });
 }
 
-export async function findModelById(db: DrizzleDb, id: string) {
-  return db.select().from(penModels).where(eq(penModels.id, id)).get();
+export async function findModelById(db: unknown, id?: string) {
+  const actualId = typeof db === "string" ? db : id!;
+  const client = getClient(db);
+  return client.penModel.findUnique({
+    where: { id: actualId },
+  });
 }
 
-export async function insertModel(db: DrizzleDb, data: NewPenModel) {
-  return db.insert(penModels).values(data).returning().get();
+export async function insertModel(db: unknown, data?: any) {
+  const payload = typeof db === "object" && data === undefined ? db : data;
+  const client = getClient(db);
+  return client.penModel.create({
+    data: payload,
+  });
 }

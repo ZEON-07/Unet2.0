@@ -3,28 +3,27 @@
  *
  * Flow:
  *  1. Normalise the query (brand+model or free-text)
- *  2. Check KV cache (30-day TTL) → return cached result if present
+ *  2. Check cache (Redis or MemoryCacheService, 30-day TTL) → return cached result if present
  *  3. Call search provider
  *  4. Persist SearchLookup record (always, even on provider failure)
  *  5. Extract writing-length claims from results
  *  6. For each claim: find/create PenSource + PenClaim (isVerified = false)
  *  7. Update SearchLookup with final counts / status
- *  8. Cache the result in KV
+ *  8. Cache the result
  *  9. Return response DTO
  */
 
-import { eq } from "drizzle-orm";
-import type { DrizzleDb } from "../repositories/db";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import * as searchLookupRepo from "../repositories/searchLookup.repository";
 import * as brandRepo from "../repositories/brand.repository";
 import * as penRepo from "../repositories/pen.repository";
-import { penSources, penClaims } from "../../drizzle/schema";
 import { extractClaims } from "../utils/claimExtractor";
 import { createProvider } from "../providers/index";
 import type { SearchLookupBody } from "../validators/searchLookup.validators";
-import type { KVNamespace } from "@cloudflare/workers-types";
+import { getCacheService, type CacheService } from "./cache.service";
 
-/** The system bot user ID seeded in migration 0003 */
+/** The system bot user ID seeded in migration */
 const PIPELINE_BOT_USER_ID = "00000000-0000-0000-0000-000000000001";
 
 // ─── Query normalisation ──────────────────────────────────────────────────────
@@ -39,7 +38,7 @@ export function buildQuery(body: SearchLookupBody): string {
   return `${parts} writing length ink flow manufacturer`.trim();
 }
 
-/** Lowercase + collapse whitespace for a stable KV cache key. */
+/** Lowercase + collapse whitespace for a stable cache key. */
 export function normalizeQuery(query: string): string {
   return query.toLowerCase().replace(/\s+/g, " ").trim();
 }
@@ -58,41 +57,49 @@ export type SearchLookupResultDto = {
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
 
 export async function runSearchLookup(
-  db: DrizzleDb,
-  kv: KVNamespace,
+  db: unknown,
+  cacheOrKv: CacheService | any,
   tavilyApiKey: string,
   clientIpHash: string | null,
   body: SearchLookupBody
 ): Promise<SearchLookupResultDto> {
+  const client = (db && typeof db === "object" && "searchLookup" in db ? db : prisma) as PrismaClient;
+  const cache: CacheService =
+    cacheOrKv && typeof cacheOrKv.get === "function" ? cacheOrKv : getCacheService();
+
   const rawQuery = buildQuery(body);
   const normalizedQuery = normalizeQuery(rawQuery);
   const cacheKey = searchLookupRepo.buildCacheKey(normalizedQuery);
 
-  // ── 1. Check KV cache ──────────────────────────────────────────────────────
-  const cached = await kv.get(cacheKey, "json") as SearchLookupResultDto | null;
-  if (cached) {
-    // Record a cache-hit lookup row for auditing but return immediately
-    const lookupId = crypto.randomUUID();
-    await searchLookupRepo.insertSearchLookup(db, {
-      id: lookupId,
-      query: normalizedQuery,
-      brand: body.brand ?? null,
-      model: body.model ?? null,
-      clientIpHash,
-      resultCount: 0,
-      status: "cached",
-      pendingClaimsCreated: 0,
-      cacheHit: true,
-      message: cached.message,
-      rawResult: null,
-      penModelId: null,
-    });
-    return { ...cached, lookupId, cachedResult: true };
+  // ── 1. Check cache (best-effort) ───────────────────────────────────────────
+  try {
+    const cached = await cache.get<SearchLookupResultDto>(cacheKey);
+    if (cached) {
+      // Record a cache-hit lookup row for auditing but return immediately
+      const lookupId = crypto.randomUUID();
+      await searchLookupRepo.insertSearchLookup(client, {
+        id: lookupId,
+        query: normalizedQuery,
+        brand: body.brand ?? null,
+        model: body.model ?? null,
+        clientIpHash,
+        resultCount: 0,
+        status: "cached",
+        pendingClaimsCreated: 0,
+        cacheHit: true,
+        message: cached.message,
+        rawResult: null,
+        penModelId: null,
+      });
+      return { ...cached, lookupId, cachedResult: true };
+    }
+  } catch (err) {
+    console.warn("[SearchLookup] Cache check failed, continuing without cache:", err);
   }
 
   // ── 2. Create the lookup record (before calling provider, so we always persist) ──
   const lookupId = crypto.randomUUID();
-  await searchLookupRepo.insertSearchLookup(db, {
+  await searchLookupRepo.insertSearchLookup(client, {
     id: lookupId,
     query: normalizedQuery,
     brand: body.brand ?? null,
@@ -117,7 +124,7 @@ export async function runSearchLookup(
     console.error(`[SearchLookup] Provider "${provider.name}" failed: ${errorMsg}`);
 
     const message = "Search provider unavailable. Please try again later.";
-    await searchLookupRepo.updateSearchLookup(db, lookupId, {
+    await searchLookupRepo.updateSearchLookup(client, lookupId, {
       status: "failed",
       message,
       rawResult: JSON.stringify({ error: errorMsg }),
@@ -139,9 +146,9 @@ export async function runSearchLookup(
   // ── 5. Try to match a pen model from brand+model inputs ───────────────────
   let resolvedPenModelId: string | null = null;
   if (body.brand && body.model) {
-    const brandRow = await brandRepo.findBrandByNameLike(db, body.brand);
+    const brandRow = await brandRepo.findBrandByNameLike(client, body.brand);
     if (brandRow) {
-      const penRow = await penRepo.findPenByBrandAndName(db, brandRow.id, body.model);
+      const penRow = await penRepo.findPenByBrandAndName(client, brandRow.id, body.model);
       if (penRow) resolvedPenModelId = penRow.id;
     }
   }
@@ -150,52 +157,50 @@ export async function runSearchLookup(
   let pendingClaimsCreated = 0;
 
   for (const claim of extractedClaims) {
-    // Only persist if we have a linked pen model (otherwise claim is orphaned)
     if (!resolvedPenModelId) continue;
 
     try {
       // 6a. Find or create PenSource by URL
       let sourceId: string | null = null;
-      const existingSource = await db
-        .select({ id: penSources.id })
-        .from(penSources)
-        .where(eq(penSources.url, claim.url))
-        .get();
+      const existingSource = await client.penSource.findFirst({
+        where: { url: claim.url },
+      });
 
       if (existingSource) {
         sourceId = existingSource.id;
       } else {
         const hostname = (() => {
-          try { return new URL(claim.url).hostname; } catch { return claim.url.slice(0, 100); }
+          try {
+            return new URL(claim.url).hostname;
+          } catch {
+            return claim.url.slice(0, 100);
+          }
         })();
-        const newSource = await db
-          .insert(penSources)
-          .values({
-            id: crypto.randomUUID(),
+        const newSource = await client.penSource.create({
+          data: {
             sourceType: "online",
             name: claim.title.slice(0, 100) || hostname,
             url: claim.url,
             isVerified: false,
-          })
-          .returning()
-          .get();
-        sourceId = newSource?.id ?? null;
+          },
+        });
+        sourceId = newSource.id;
       }
 
       // 6b. Create pending PenClaim (isVerified = false — never auto-activate)
-      await db.insert(penClaims).values({
-        id: crypto.randomUUID(),
-        userId: PIPELINE_BOT_USER_ID,
-        penModelId: resolvedPenModelId,
-        sourceId,
-        mileageClaimed: claim.writingLengthMetres,
-        notes: `Auto-extracted by search pipeline from: ${claim.url}\nSnippet: ${claim.snippet.slice(0, 300)}`,
-        isVerified: false,
+      await client.penClaim.create({
+        data: {
+          userId: PIPELINE_BOT_USER_ID,
+          penModelId: resolvedPenModelId,
+          sourceId,
+          mileageClaimed: claim.writingLengthMetres,
+          notes: `Auto-extracted by search pipeline from: ${claim.url}\nSnippet: ${claim.snippet.slice(0, 300)}`,
+          isVerified: false,
+        },
       });
 
       pendingClaimsCreated++;
     } catch (err) {
-      // Log but don't fail the whole pipeline for a single claim error
       console.error(`[SearchLookup] Failed to persist claim: ${err}`);
     }
   }
@@ -212,7 +217,7 @@ export async function runSearchLookup(
   })();
 
   // ── 8. Update the lookup record with final state ──────────────────────────
-  await searchLookupRepo.updateSearchLookup(db, lookupId, {
+  await searchLookupRepo.updateSearchLookup(client, lookupId, {
     status: "completed",
     resultCount: providerResponse.results.length,
     rawResult: JSON.stringify(providerResponse.rawResponse),
@@ -221,7 +226,7 @@ export async function runSearchLookup(
     message,
   });
 
-  // ── 9. Cache result in KV (30 days) ──────────────────────────────────────
+  // ── 9. Cache result (30 days, best-effort) ────────────────────────────────
   const cachePayload: Omit<SearchLookupResultDto, "lookupId"> = {
     status: "completed",
     message,
@@ -229,9 +234,12 @@ export async function runSearchLookup(
     cachedResult: false,
     providerUsed: provider.name,
   };
-  await kv.put(cacheKey, JSON.stringify(cachePayload), {
-    expirationTtl: searchLookupRepo.SEARCH_CACHE_TTL_SECONDS,
-  });
+
+  try {
+    await cache.set(cacheKey, cachePayload, searchLookupRepo.SEARCH_CACHE_TTL_SECONDS);
+  } catch (err) {
+    console.warn("[SearchLookup] Cache SET failed, continuing:", err);
+  }
 
   return {
     lookupId,

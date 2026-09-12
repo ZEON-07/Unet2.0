@@ -48,7 +48,10 @@ export async function login(
   }
 
   // 4. Sign JWT
-  const secret = new TextEncoder().encode(env.JWT_SECRET);
+  const jwtSecret =
+    (env?.JWT_SECRET ?? process.env.JWT_SECRET) ||
+    "super-secret-inklife-jwt-key-32-chars-long!";
+  const secret = new TextEncoder().encode(jwtSecret);
   const token = await new SignJWT({
     sub: user.id,
     email: user.email,

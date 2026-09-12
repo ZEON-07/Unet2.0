@@ -3,9 +3,8 @@
  * Every mutation writes an entry to admin_audit_logs.
  */
 
-import { eq } from "drizzle-orm";
-import { penModels } from "../../drizzle/schema";
-import type { DrizzleDb } from "../repositories/db";
+import { prisma } from "../lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import * as claimRepo from "../repositories/claim.repository";
 import * as auditRepo from "../repositories/auditLog.repository";
 import * as searchLookupRepo from "../repositories/searchLookup.repository";
@@ -20,6 +19,10 @@ import type {
   SearchLookupQuery,
 } from "../validators/admin.validators";
 
+function getClient(db?: unknown): PrismaClient {
+  return (db && typeof db === "object" && "penModel" in db ? db : prisma) as PrismaClient;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Convert an arbitrary string to a URL-safe slug. */
@@ -33,12 +36,12 @@ function toSlug(s: string): string {
 
 // ─── Claims ───────────────────────────────────────────────────────────────────
 
-export async function getPendingClaims(db: DrizzleDb) {
+export async function getPendingClaims(db?: unknown) {
   return claimRepo.findPendingClaims(db);
 }
 
 export async function patchClaim(
-  db: DrizzleDb,
+  db: unknown,
   adminId: string,
   clientIp: string | null,
   claimId: string,
@@ -71,7 +74,7 @@ export async function patchClaim(
 // ─── Pens ─────────────────────────────────────────────────────────────────────
 
 export async function createPen(
-  db: DrizzleDb,
+  db: unknown,
   adminId: string,
   clientIp: string | null,
   body: CreatePenBody
@@ -90,12 +93,11 @@ export async function createPen(
       brandId = existing.id;
     } else {
       const newBrand = await penModelRepo.insertBrand(db, {
-        id: crypto.randomUUID(),
         name: body.brandName!,
         slug,
         countryOfOrigin: body.brandCountry ?? null,
       });
-      brandId = newBrand!.id;
+      brandId = newBrand.id;
     }
   }
 
@@ -112,14 +114,12 @@ export async function createPen(
   }
 
   // 4. Insert pen model
-  const penId = crypto.randomUUID();
   const pen = await penModelRepo.insertModel(db, {
-    id: penId,
     brandId,
     name: body.name,
     slug: modelSlug,
-    flowCategory: body.flowCategory as never,
-    barrelVisibility: body.barrelVisibility as never,
+    flowCategory: body.flowCategory,
+    barrelVisibility: body.barrelVisibility,
     nominalMileageM: body.nominalMileageM ?? null,
     imageUrl: body.imageUrl ?? null,
     description: body.description ?? null,
@@ -131,7 +131,7 @@ export async function createPen(
     adminUserId: adminId,
     action: "CREATE_PEN_MODEL",
     targetType: "PenModel",
-    targetId: penId,
+    targetId: pen.id,
     metadata: JSON.stringify({
       name: body.name,
       slug: modelSlug,
@@ -145,7 +145,7 @@ export async function createPen(
 }
 
 export async function patchPen(
-  db: DrizzleDb,
+  db: unknown,
   adminId: string,
   clientIp: string | null,
   penId: string,
@@ -155,29 +155,23 @@ export async function patchPen(
   const existing = await penRepo.findPenByIdOrSlug(db, penId);
   if (!existing) throw new NotFoundError("PenModel", penId);
 
+  const client = getClient(db);
+
   // Build partial update — only include fields that were explicitly provided
-  const updatedAt = new Date().toISOString();
-  const patch: Partial<typeof penModels.$inferInsert> & { updatedAt: string } = {
-    updatedAt,
-  };
+  const data: any = {};
+  if (body.name !== undefined) data.name = body.name;
+  if (body.flowCategory !== undefined) data.flowCategory = body.flowCategory;
+  if (body.barrelVisibility !== undefined) data.barrelVisibility = body.barrelVisibility;
+  if (body.nominalMileageM !== undefined) data.nominalMileageM = body.nominalMileageM;
+  if (body.communityMileageM !== undefined) data.communityMileageM = body.communityMileageM;
+  if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl;
+  if (body.description !== undefined) data.description = body.description;
+  if (body.isActive !== undefined) data.isActive = body.isActive;
 
-  if (body.name !== undefined) patch.name = body.name;
-  if (body.flowCategory !== undefined) patch.flowCategory = body.flowCategory as never;
-  if (body.barrelVisibility !== undefined)
-    patch.barrelVisibility = body.barrelVisibility as never;
-  if (body.nominalMileageM !== undefined) patch.nominalMileageM = body.nominalMileageM;
-  if (body.communityMileageM !== undefined)
-    patch.communityMileageM = body.communityMileageM;
-  if (body.imageUrl !== undefined) patch.imageUrl = body.imageUrl;
-  if (body.description !== undefined) patch.description = body.description;
-  if (body.isActive !== undefined) patch.isActive = body.isActive;
-
-  const updated = await db
-    .update(penModels)
-    .set(patch)
-    .where(eq(penModels.id, existing.id))
-    .returning()
-    .get();
+  const updated = await client.penModel.update({
+    where: { id: existing.id },
+    data,
+  });
 
   // Audit log
   await auditRepo.insertAuditLog(db, {
@@ -194,8 +188,8 @@ export async function patchPen(
 
 // ─── Search Lookups ───────────────────────────────────────────────────────────
 
-export async function getSearchLookups(db: DrizzleDb, query: SearchLookupQuery) {
-  const { page, limit } = query;
+export async function getSearchLookups(db: unknown, query: SearchLookupQuery) {
+  const { page = 1, limit = 20 } = query || {};
   const offset = (page - 1) * limit;
   const { rows, total } = await searchLookupRepo.listSearchLookups(
     db,

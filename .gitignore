@@ -1,19 +1,30 @@
 node_modules/
+frontend/node_modules/
 dist/
 .wrangler/
 .dev.vars
 *.local
 
-# drizzle local SQLite snapshots (generated)
-drizzle/migrations/meta/
-
-# env files with secrets
-.env
-.env.local
-.env.*.local
-node_modules/
-.next/
-dist/
+# Environment files
 .env
 .env.*
 !.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Build output
+.next/
+frontend/.next/
+
+# Drizzle backup
+drizzle/migrations/meta/
+
+# Do NOT ignore Prisma migrations
+!prisma/migrations/

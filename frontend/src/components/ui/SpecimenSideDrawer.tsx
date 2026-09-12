@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ArrowRight, ExternalLink, ShieldCheck, Droplet, Ruler, Compass } from "lucide-react";
+import { X, ArrowRight, ShieldCheck, Droplet, Ruler, Compass } from "lucide-react";
 import type { PenModel } from "@/types";
 
 export interface SpecimenSideDrawerProps {

@@ -4,12 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useInkMode } from "@/components/providers/InkModeProvider";
-import { Menu, X, Globe, Sun, Moon } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { mode, toggleMode } = useInkMode();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [timeString, setTimeString] = useState("");
   const [cityCode, setCityCode] = useState("LAB");
@@ -41,6 +39,7 @@ export function Navbar() {
 
   const navLinks = [
     { label: "CALCULATOR", href: "/#estimate" },
+    { label: "METHODOLOGY", href: "/#methodology" },
     { label: "SPECIMENS", href: "/#specimens" },
   ];
 
@@ -87,29 +86,15 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* ── Top Right: Local Time & "Change Ink Mode" ── */}
+        {/* ── Top Right: Local Time ── */}
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Local Time Display */}
-          <div className="hidden sm:flex flex-col text-right font-mono text-[9px] leading-tight text-[var(--muted)]">
+          <div className="flex flex-col text-right font-mono text-[9px] leading-tight text-[var(--muted)]">
             <span className="tracking-widest uppercase">LOCAL TIME</span>
             <span className="text-[var(--foreground)] font-bold">
               {cityCode} {timeString || "00:00"}
             </span>
           </div>
-
-          <div className="hidden sm:block w-[1px] h-6 bg-[var(--line)]" />
-
-          {/* Change Ink Mode Button (inspired by "Change Reality") */}
-          <button
-            type="button"
-            onClick={toggleMode}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono font-bold tracking-wider uppercase border border-[var(--foreground)] bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Toggle between Light paper lab and Dark ultraviolet analysis mode"
-          >
-            <Globe className="w-3 h-3 text-[var(--ink-blue)]" />
-            <span>CHANGE INK MODE</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--ink-blue)]" />
-          </button>
 
           {/* Mobile Menu Toggle */}
           <button
@@ -142,15 +127,6 @@ export function Navbar() {
 
           <div className="pt-2 flex justify-between items-center text-[10px] text-[var(--muted)] font-mono">
             <span>LOCAL: {cityCode} {timeString}</span>
-            <button
-              onClick={() => {
-                toggleMode();
-                setMobileOpen(false);
-              }}
-              className="px-2 py-1 border border-[var(--foreground)] text-[var(--foreground)] font-bold"
-            >
-              MODE: {mode.toUpperCase()}
-            </button>
           </div>
         </div>
       )}

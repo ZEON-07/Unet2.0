@@ -32,6 +32,7 @@ import { RefillCanvas } from "@/components/three/RefillCanvas";
 import { InkLifeLoader } from "@/components/3d/InkLifeLoader";
 import { useInkMode } from "@/components/providers/InkModeProvider";
 import { SpecimenSideDrawer } from "@/components/ui/SpecimenSideDrawer";
+import { MethodologySection } from "@/components/ui/MethodologySection";
 
 function getSelectedPageEstimate(
   notebookType: NotebookType | string,
@@ -128,12 +129,14 @@ export default function HomePage() {
     () => false
   );
 
-  const handleIntroComplete = useCallback(() => {
+  const handleIntroComplete = useCallback((calibratedInk?: number) => {
+    if (typeof calibratedInk === "number") {
+      setInkLevel(calibratedInk);
+    }
     setShowIntro(false);
   }, []);
 
   const replayIntro = () => {
-    setInkLevel(65);
     setShowIntro(true);
   };
 
@@ -298,9 +301,12 @@ export default function HomePage() {
   return (
     <>
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/*  00. OPENING FULL-SCREEN LABORATORY LOADER                          */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {showIntro && <InkLifeLoader onComplete={handleIntroComplete} />}
+      {showIntro && (
+        <InkLifeLoader
+          onComplete={handleIntroComplete}
+          initialInkLevel={inkLevel}
+        />
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/*  01. SECTION 01 — ASYMMETRIC SWISS EDITORIAL HERO                   */}
@@ -860,6 +866,11 @@ export default function HomePage() {
           </motion.section>
         )}
       </AnimatePresence>
+
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/*  02.5 MATHEMATICAL METHODOLOGY & PREDICTION ENGINE EQUATIONS        */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      <MethodologySection />
 
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/*  03. SECTION 03 — SUPPORTED INK SYSTEMS: FLOATING SPECIMEN GALLERY   */}

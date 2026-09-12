@@ -360,7 +360,7 @@ export default function HomePage() {
             <div className="mt-5 grid grid-cols-3 gap-3 border border-[var(--line)] bg-[var(--surface)] p-3 max-w-lg font-mono text-[10px]">
               <div>
                 <div className="text-[var(--muted)] uppercase">SYSTEM</div>
-                <div className="font-bold text-[var(--foreground)] mt-0.5">INKLIFE 01</div>
+                <div className="font-bold text-[var(--foreground)] mt-0.5">MASHI UNDO MASHE?</div>
               </div>
               <div className="border-l border-[var(--line)] pl-3">
                 <div className="text-[var(--muted)] uppercase">INPUT</div>
@@ -815,7 +815,7 @@ export default function HomePage() {
                         <span className="text-[var(--muted)]">Usable Writing Distance:</span>
                         <span
                           className="text-[var(--ink-blue)] cursor-help"
-                          title="Manufacturer writing-distance claims are measured under ideal conditions. InkLife applies a real-world handwriting adjustment."
+                          title="Manufacturer writing-distance claims are measured under ideal conditions. Mashi Undo Mashe? applies a real-world handwriting adjustment."
                         >
                           <Info className="w-3.5 h-3.5" />
                         </span>

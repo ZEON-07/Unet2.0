@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useInkMode } from "@/components/providers/InkModeProvider";
 import { Menu, X, Globe, Sun, Moon } from "lucide-react";
@@ -47,13 +48,25 @@ export function Navbar() {
     <header className="sticky top-0 z-40 w-full bg-[var(--background)]/90 backdrop-blur-md border-b border-[var(--line)] transition-colors duration-400">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-2.5">
         {/* ── Top Left: Brand / Editorial Logotype ── */}
-        <Link href="/" className="flex flex-col text-left group">
-          <span className="font-extrabold text-sm sm:text-base tracking-tighter text-[var(--foreground)] uppercase leading-none flex items-center gap-1.5">
-            INKLIFE<span className="text-[10px] text-[var(--ink-blue)] font-mono">®</span>
-          </span>
-          <span className="text-[9px] sm:text-[10px] font-mono tracking-widest text-[var(--muted)] uppercase mt-0.5">
-            INK ESTIMATION LAB
-          </span>
+        <Link href="/" className="flex items-center gap-2.5 sm:gap-3 text-left group">
+          <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-lg overflow-hidden border border-[var(--line)] bg-[var(--surface)] shadow-xs group-hover:border-[var(--ink-blue)] transition-colors flex items-center justify-center">
+            <Image
+              src="/logo.png"
+              alt="മഷി ഉണ്ടോ മാഷേ ? Logo"
+              width={36}
+              height={36}
+              className="w-full h-full object-contain p-0.5"
+              priority
+            />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-extrabold text-sm sm:text-base tracking-tight text-[var(--foreground)] leading-none flex items-center gap-1.5">
+              മഷി ഉണ്ടോ മാഷേ ?
+            </span>
+            <span className="text-[9px] sm:text-[10px] font-mono tracking-wider text-[var(--ink-blue)] uppercase mt-1">
+              MASHI UNDO MASHE? • INK LAB
+            </span>
+          </div>
         </Link>
 
         {/* ── Top Centre: Editorial Navigation Links ── */}

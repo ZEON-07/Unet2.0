@@ -95,7 +95,7 @@ export function EditorialFrame() {
         {/* Bottom Status Bar Metadata */}
         <div className="absolute bottom-1 left-3 right-4 flex items-center justify-between text-[8px] sm:text-[9px] font-mono text-[var(--muted)] tracking-wider">
           <div className="flex items-center gap-3">
-            <span>INKLIFE® / LAB-V2</span>
+            <span>മഷി ഉണ്ടോ മാഷേ ? / LAB-V2</span>
             <span className="hidden sm:inline opacity-40">•</span>
             <span className="hidden sm:inline">MODE: {mode.toUpperCase()}</span>
           </div>

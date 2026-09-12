@@ -72,8 +72,8 @@ npm run dev
 
 The app will be live at:
 
-- **Frontend App:** `http://localhost:3000`
-- **Backend API & Swagger Docs:** `http://localhost:8787/api/docs`
+- **Frontend App:** `https://unet2-0.vercel.app/`
+- **Backend API & Swagger Docs:** `https://inklife-api.onrender.com/`
 
 ---
 
@@ -83,36 +83,14 @@ The app will be live at:
 
 # Screenshots
 
-![Interactive 3D Refill Visualizer](public/pen-nib-original.png)
+![Interactive 3D Refill Visualizer](public/ss/1.png)
+
 _1. Interactive 3D Refill & Ink Estimator — Drag the 3D refill or slider to set visible ink level (0–100%) with real-time feedback._
 
-![Prediction Results & Notebook Yield](public/pen-cursor-64.png)
+![Prediction Results & Notebook Yield](public/ss/2.png)
 _2. Accurate Page Yield Calculator — Breakdown of remaining distance (meters) and pages across Long Book, Queen Book, and King Book._
 
-![Web-Search Claim Discovery Pipeline](public/pen-cursor-nib.png)
-_3. Automated Pen Claim Discovery — Web-search pipeline discovering manufacturer write-out specs with 30-day KV cache._
-
-# Diagrams
-
-```mermaid
-flowchart TD
-    A[User Inspects Pen Refill] --> B[Interactive 3D Refill / Slider Input]
-    B --> C[Select Writing Style & Notebook Type]
-    C --> D[Next.js Frontend]
-    D -->|POST /api/predictions| E[Cloudflare Workers + Hono API]
-    E --> F[Resolve Pen / Nominal Mileage]
-    F --> G[Prediction Calculation Engine]
-    G -->|Ink Flow Factor × Style Factor ÷ Page Area| H[D1 SQLite Database]
-    H --> I[Store & Cache Prediction]
-    I --> J[Return Exact Meters & Page Count to UI]
-
-    K[Web-Search Pipeline] -->|Search Provider / Tavily| L[Extract Writing Lengths]
-    L -->|KV 30-day Cache| E
-```
-
-_Architecture and calculation workflow of the InkLife prediction system._
-
----
+![SUPPORTED INK SYSTEMS](public/ss/3.png)
 
 ## Team Contributions
 

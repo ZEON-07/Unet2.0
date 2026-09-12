@@ -26,15 +26,32 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InkLife® — Laboratory Pen-Life & Writing Distance Estimator",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  title: "മഷി ഉണ്ടോ മാഷേ ? (Mashi Undo Mashe?) — Laboratory Pen-Life & Writing Distance Estimator",
   description:
-    "Experimental laboratory interface for estimating remaining handwriting distance and notebook page capacity from visible pen ink.",
-  keywords: ["ink estimator", "pen ink life", "stationery laboratory", "pen writing distance", "pages remaining"],
+    "A playful, hyper-accurate stationery-tech application and interactive 3D pen visualizer that calculates exactly how many pages and meters of writing your pen has left based on its visible refill level.",
+  keywords: ["മഷി ഉണ്ടോ മാഷേ", "mashi undo mashe", "ink estimator", "pen ink life", "stationery laboratory", "pen writing distance", "pages remaining"],
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/logo.png",
+  },
   openGraph: {
-    title: "InkLife® — Ink Estimation Lab",
+    title: "മഷി ഉണ്ടോ മാഷേ ? (Mashi Undo Mashe?) — Ink Estimation Lab",
     description: "Every drop has a distance. Visible ink detection & handwriting prediction.",
     type: "website",
-    siteName: "InkLife",
+    siteName: "മഷി ഉണ്ടോ മാഷേ ? (Mashi Undo Mashe?)",
+    images: [
+      {
+        url: "/logo.png",
+        width: 512,
+        height: 512,
+        alt: "മഷി ഉണ്ടോ മാഷേ ? Logo",
+      },
+    ],
   },
 };
 

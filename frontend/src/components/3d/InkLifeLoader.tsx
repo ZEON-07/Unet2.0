@@ -139,12 +139,12 @@ export function InkLifeLoader({ onComplete, forcePlay = false }: InkLifeLoaderPr
           {/* ── Top Header ── */}
           <div className="relative z-20 flex items-center justify-between w-full max-w-7xl mx-auto border-b border-[rgba(11,15,20,0.15)] pb-4 font-mono text-[11px]">
             <div className="flex items-center gap-3">
-              <span className="font-extrabold tracking-tighter uppercase text-sm">
-                INKLIFE<span className="text-[#225CFF]">®</span>
+              <span className="font-extrabold tracking-tight text-sm">
+                മഷി ഉണ്ടോ മാഷേ ?
               </span>
               <span className="text-[rgba(11,15,20,0.4)]">/</span>
               <span className="tracking-widest uppercase text-[rgba(11,15,20,0.6)]">
-                CALIBRATION LAB
+                MASHI UNDO MASHE?
               </span>
             </div>
 

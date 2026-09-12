@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Outer Badge / Container -->
+  <rect width="64" height="64" rx="16" fill="#0B0F14" />
+  <rect x="1" y="1" width="62" height="62" rx="15" stroke="rgba(255,255,255,0.12)" stroke-width="2" />
+  
+  <!-- Metallic Pen Collar -->
+  <path d="M21 14 H43 L41 26 H23 Z" fill="#71717A" stroke="#A1A1AA" stroke-width="1.5" stroke-linejoin="round" />
+  
+  <!-- Pen Nib Geometry -->
+  <path d="M23 26 L32 51 L41 26 Z" fill="#225CFF" stroke="#3B82F6" stroke-width="1.5" stroke-linejoin="round" />
+  
+  <!-- Breather Hole & Ink Slit -->
+  <circle cx="32" cy="33" r="2.5" fill="#FFFFFF" />
+  <line x1="32" y1="35.5" x2="32" y2="47" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" />
+  
+  <!-- Fluid Ink Droplet -->
+  <path d="M32 51 C32 51 29.5 54 29.5 56 C29.5 57.4 30.6 58.5 32 58.5 C33.4 58.5 34.5 57.4 34.5 56 C34.5 54 32 51 32 51 Z" fill="#60A5FA" />
+</svg>

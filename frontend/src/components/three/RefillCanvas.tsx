@@ -177,41 +177,41 @@ export function RefillCanvas({
           }}
           className="cursor-ns-resize"
         >
-          {/* Studio Lighting Rig — Self-contained without external CDN dependencies */}
-          <ambientLight intensity={isDarkAnalysisMode ? 0.4 : 0.95} />
+          {/* Studio Lighting Rig — Balanced for high-contrast ink visibility */}
+          <ambientLight intensity={isDarkAnalysisMode ? 0.4 : 0.65} />
           <hemisphereLight
             args={[
-              isDarkAnalysisMode ? "#4D78FF" : "#ffffff",
+              isDarkAnalysisMode ? "#4D78FF" : "#F8FAFC",
               isDarkAnalysisMode ? "#0B0F14" : "#E2E8F0",
-              isDarkAnalysisMode ? 0.5 : 0.7,
+              isDarkAnalysisMode ? 0.5 : 0.5,
             ]}
           />
           
-          {/* Soft Key Light */}
+          {/* Key Light */}
           <directionalLight
             position={[3, 6, 4]}
-            intensity={isDarkAnalysisMode ? 0.7 : 1.4}
+            intensity={isDarkAnalysisMode ? 0.6 : 0.9}
             castShadow={false}
           />
           
           {/* Fill Light */}
           <directionalLight
             position={[-3, 2, 3]}
-            intensity={isDarkAnalysisMode ? 0.3 : 0.6}
+            intensity={isDarkAnalysisMode ? 0.3 : 0.45}
             color={isDarkAnalysisMode ? "#62DDD1" : "#F8FAFC"}
           />
 
           {/* Electric Blue Rim Light */}
           <pointLight
             position={[-2.5, -2, -2]}
-            color={isDarkAnalysisMode ? "#4D78FF" : "#225CFF"}
-            intensity={isDarkAnalysisMode ? 1.6 : 1.1}
+            color={isDarkAnalysisMode ? "#4D78FF" : "#0055FF"}
+            intensity={isDarkAnalysisMode ? 1.5 : 1.2}
           />
 
           {/* Back Specular Light */}
           <directionalLight
             position={[0, 4, -4]}
-            intensity={0.7}
+            intensity={0.4}
             color="#FFFFFF"
           />
 

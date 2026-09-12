@@ -22,7 +22,7 @@ export function InkController({
   anchorGeomY,
   initialScaleY = 1.0,
   fillAxis = "y",
-  isDarkAnalysisMode: _isDarkAnalysisMode = false,
+  isDarkAnalysisMode = false,
   colorOverride,
 }: InkControllerProps) {
   // Current smoothly damped scale factor
@@ -52,13 +52,19 @@ export function InkController({
     // 2. Compensating position offset to keep bottom strictly anchored against tip
     inkMesh.position[fillAxis] = anchorWorldY - s * anchorGeomY;
 
-    // 3. Optional color override only if explicitly requested
-    if (colorOverride && inkMesh.material) {
+    // 3. Keep ink liquid intensely, unmistakably rich royal blue
+    if (inkMesh.material) {
       const mat = (
         Array.isArray(inkMesh.material) ? inkMesh.material[0] : inkMesh.material
       ) as THREE.MeshStandardMaterial;
-      if (mat && mat.color) {
-        mat.color.set(colorOverride);
+      if (mat) {
+        const inkBlue = colorOverride || (isDarkAnalysisMode ? "#2B6CB0" : "#0047E1");
+        const emissiveBlue = colorOverride || (isDarkAnalysisMode ? "#1E40AF" : "#002EA8");
+        if (mat.color) mat.color.set(inkBlue);
+        if (mat.emissive) {
+          mat.emissive.set(emissiveBlue);
+          mat.emissiveIntensity = isDarkAnalysisMode ? 0.45 : 0.35;
+        }
       }
     }
   });

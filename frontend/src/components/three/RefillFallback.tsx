@@ -45,7 +45,7 @@ export function RefillFallback({
     window.addEventListener("pointerup", onPointerUp);
   };
 
-  const inkColor = isDarkAnalysisMode ? "#4D78FF" : "#225CFF";
+  const inkColor = isDarkAnalysisMode ? "#4D78FF" : "#0047E1";
   const strokeColor = isDarkAnalysisMode ? "rgba(255,255,255,0.25)" : "rgba(11,15,20,0.25)";
   const textColor = isDarkAnalysisMode ? "#A3A69F" : "#6B6F76";
 

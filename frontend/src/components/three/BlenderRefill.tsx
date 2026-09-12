@@ -71,13 +71,17 @@ export function BlenderRefill({
     const metalTip = findFirstObject(model, ["Metal_Tip", "Cylinder.001"]) as THREE.Mesh | null;
     const rearPlug = findFirstObject(model, ["Rear_Plug", "Cylinder.003"]) as THREE.Mesh | null;
 
-    // Apply WebGL transparency order without altering author's material properties
+    // Apply WebGL transparency order without altering author's model geometry
     if (barrel) {
       barrel.renderOrder = 2; // Render outer transparent barrel after liquid to prevent occlusion
       const mat = (Array.isArray(barrel.material) ? barrel.material[0] : barrel.material) as THREE.MeshStandardMaterial;
       if (mat) {
         mat.transparent = true;
+        mat.opacity = 0.15; // Crystal-clear transparent outer barrel so ink is 100% visible
         mat.depthWrite = false; // Prevent glass barrel from writing to depth buffer
+        mat.roughness = 0.05;
+        mat.metalness = 0.0;
+        mat.color = new THREE.Color("#F8FAFC");
       }
     }
 
@@ -85,7 +89,16 @@ export function BlenderRefill({
       inkLiquid.renderOrder = 1;
       const mat = (Array.isArray(inkLiquid.material) ? inkLiquid.material[0] : inkLiquid.material) as THREE.MeshStandardMaterial;
       if (mat) {
-        mat.transparent = true;
+        mat.transparent = false;
+        mat.opacity = 1.0;
+        mat.roughness = 0.1;
+        mat.metalness = 0.02;
+        mat.depthWrite = true;
+        const inkBlue = colorOverride || (isDarkAnalysisMode ? "#2B6CB0" : "#0047E1");
+        const emissiveBlue = colorOverride || (isDarkAnalysisMode ? "#1E40AF" : "#002EA8");
+        mat.color = new THREE.Color(inkBlue);
+        mat.emissive = new THREE.Color(emissiveBlue);
+        mat.emissiveIntensity = isDarkAnalysisMode ? 0.45 : 0.35;
       }
     }
 

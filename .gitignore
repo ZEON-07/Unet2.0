@@ -11,3 +11,9 @@ drizzle/migrations/meta/
 .env
 .env.local
 .env.*.local
+node_modules/
+.next/
+dist/
+.env
+.env.*
+!.env.example

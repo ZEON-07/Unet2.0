@@ -28,7 +28,7 @@ import type {
   WritingStyle,
   NotebookType,
 } from "@/types";
-import { RefillScene } from "@/components/3d/RefillScene";
+import { RefillCanvas } from "@/components/three/RefillCanvas";
 import { InkLifeLoader } from "@/components/3d/InkLifeLoader";
 import { useInkMode } from "@/components/providers/InkModeProvider";
 import { SpecimenSideDrawer } from "@/components/ui/SpecimenSideDrawer";
@@ -296,7 +296,7 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════════════════════════ */}
       {/*  01. SECTION 01 — ASYMMETRIC SWISS EDITORIAL HERO                   */}
       {/* ═══════════════════════════════════════════════════════════════════ */}
-      <section className="relative min-h-[92vh] border-b border-[var(--line)] flex flex-col justify-between overflow-hidden px-4 sm:px-8 pt-8 pb-12">
+      <section className="relative min-h-[85vh] border-b border-[var(--line)] flex flex-col justify-between px-4 sm:px-8 pt-4 pb-4">
         {/* Background Grid Crosses */}
         <div className="absolute top-12 left-12 tech-cross" />
         <div className="absolute top-12 right-12 tech-cross" />
@@ -304,7 +304,7 @@ export default function HomePage() {
         <div className="absolute bottom-12 right-12 tech-cross" />
 
         {/* Top Identification Bar */}
-        <div className="relative z-20 flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] tracking-widest uppercase text-[var(--muted)] border-b border-[var(--line)] pb-3">
+        <div className="relative z-20 flex flex-wrap items-center justify-between gap-4 font-mono text-[10px] tracking-widest uppercase text-[var(--muted)] border-b border-[var(--line)] pb-2.5">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[var(--ink-blue)] animate-pulse" />
             <span className="text-[var(--foreground)] font-bold">INK ANALYSIS SYSTEM</span>
@@ -324,14 +324,14 @@ export default function HomePage() {
         </div>
 
         {/* Main Hero Grid: Left Typography, Center 3D Refill with Technical Leaders */}
-        <div className="relative z-20 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-8">
-          {/* Left Column (7 cols): Massive Grotesque Typography */}
-          <div className="lg:col-span-7 flex flex-col justify-center text-left">
-            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--muted)] mb-3">
+        <div className="relative z-20 w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center my-auto py-2">
+          {/* Left Column (6 cols): Massive Grotesque Typography */}
+          <div className="lg:col-span-6 flex flex-col justify-center text-left">
+            <span className="text-[11px] font-mono tracking-widest uppercase text-[var(--muted)] mb-2">
               [ ESTIMATION MODULE 01 ]
             </span>
 
-            <h1 className="text-5xl sm:text-7xl lg:text-[104px] font-black uppercase tracking-tighter leading-[0.88] text-[var(--foreground)]">
+            <h1 className="text-4xl sm:text-6xl lg:text-[80px] xl:text-[90px] font-black uppercase tracking-tighter leading-[0.88] text-[var(--foreground)]">
               HOW MUCH<br />
               LIFE IS LEFT<br />
               IN YOUR{" "}
@@ -340,7 +340,7 @@ export default function HomePage() {
               </span>
             </h1>
 
-            <div className="mt-8 max-w-md space-y-1 text-sm sm:text-base text-[var(--muted)] font-mono leading-relaxed">
+            <div className="mt-4 max-w-md space-y-0.5 text-xs sm:text-sm text-[var(--muted)] font-mono leading-relaxed">
               <p>A question nobody asked.</p>
               <p className="text-[var(--foreground)] font-medium">
                 An estimate every transparent pen deserves.
@@ -348,7 +348,7 @@ export default function HomePage() {
             </div>
 
             {/* Telemetry Panel */}
-            <div className="mt-8 grid grid-cols-3 gap-3 border border-[var(--line)] bg-[var(--surface)] p-3.5 max-w-lg font-mono text-[10px]">
+            <div className="mt-5 grid grid-cols-3 gap-3 border border-[var(--line)] bg-[var(--surface)] p-3 max-w-lg font-mono text-[10px]">
               <div>
                 <div className="text-[var(--muted)] uppercase">SYSTEM</div>
                 <div className="font-bold text-[var(--foreground)] mt-0.5">INKLIFE 01</div>
@@ -365,28 +365,28 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-5 flex items-center gap-3">
               <Link
                 href="/#estimate"
-                className="px-6 py-3.5 bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--ink-blue)] hover:text-white transition-all text-xs font-mono font-bold tracking-widest uppercase shadow-sm flex items-center gap-2"
+                className="px-5 py-3 bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--ink-blue)] hover:text-white transition-all text-xs font-mono font-bold tracking-widest uppercase shadow-sm flex items-center gap-2"
               >
                 CONFIGURE SAMPLE <ArrowDownRight className="w-4 h-4" />
               </Link>
 
               <Link
                 href="/#methodology"
-                className="px-5 py-3.5 border border-[var(--line)] bg-[var(--surface)] text-[var(--foreground)] hover:border-[var(--foreground)] transition-all text-xs font-mono font-bold tracking-widest uppercase"
+                className="px-4 py-3 border border-[var(--line)] bg-[var(--surface)] text-[var(--foreground)] hover:border-[var(--foreground)] transition-all text-xs font-mono font-bold tracking-widest uppercase"
               >
                 VIEW METHOD
               </Link>
             </div>
           </div>
 
-          {/* Right Column (5 cols): Central Interactive 3D Refill with Technical Annotations */}
-          <div className="lg:col-span-5 relative h-[500px] sm:h-[580px] w-full flex items-center justify-center">
+          {/* Right Column (6 cols): Central Interactive 3D Refill with Technical Annotations */}
+          <div className="lg:col-span-6 relative h-[440px] w-full flex items-center justify-center">
             {/* 3D Scene */}
             <div className="absolute inset-0 z-10">
-              <RefillScene
+              <RefillCanvas
                 mode="hero"
                 inkPercentage={inkLevel}
                 onInkChange={setInkLevel}
@@ -398,7 +398,7 @@ export default function HomePage() {
             {/* Technical Annotation Leader Lines (Overlay) */}
             <div className="absolute inset-0 z-20 pointer-events-none flex flex-col justify-between p-2 sm:p-4 font-mono text-[9px] sm:text-[10px] text-[var(--muted)] select-none">
               {/* Top Right Callout */}
-              <div className="self-end flex items-center gap-2">
+              <div className="self-end flex items-center gap-2 mt-1">
                 <div className="p-1.5 border border-[var(--line)] bg-[var(--surface)] shadow-xs">
                   <div className="font-bold text-[var(--foreground)]">VISIBLE INK COLUMN</div>
                   <div>USER-CONTROLLED LEVEL: {Math.round(inkLevel)}%</div>
@@ -416,7 +416,7 @@ export default function HomePage() {
               </div>
 
               {/* Bottom Right Callout */}
-              <div className="self-end flex items-center gap-2">
+              <div className="self-end flex items-center gap-2 mb-2">
                 <div className="p-1.5 border border-[var(--line)] bg-[var(--surface)] shadow-xs">
                   <div className="font-bold text-[var(--foreground)]">DRAG REFILL / SET LEVEL</div>
                   <div className="text-[var(--ink-blue)] font-bold">↕ VERTICAL SLIDER SYNC</div>

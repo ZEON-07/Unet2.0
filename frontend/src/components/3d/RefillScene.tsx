@@ -1,6 +1,6 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
+import { Component, Suspense, type ReactNode } from "react";
 import { Canvas } from "@react-three/fiber";
 import { RefillModel } from "./RefillModel";
 import { InjectionNozzle } from "./InjectionNozzle";
@@ -142,27 +142,29 @@ export function RefillScene({
         )}
 
         {/* ── Refill Model + Controller ── */}
-        <HeroRefillController
-          mode={mode}
-          introTransitionProgress={introTransitionProgress}
-          scrollProgress={scrollProgress}
-        >
-          <RefillModel
-            inkPercentage={inkPercentage}
-            interactiveSlider={mode === "hero"}
-            onInkChange={onInkChange}
-            highlightMeniscus={isDispensing || isScanning}
-            isDarkAnalysisMode={isDark}
-          />
+        <Suspense fallback={null}>
+          <HeroRefillController
+            mode={mode}
+            introTransitionProgress={introTransitionProgress}
+            scrollProgress={scrollProgress}
+          >
+            <RefillModel
+              inkPercentage={inkPercentage}
+              interactiveSlider={mode === "hero"}
+              onInkChange={onInkChange}
+              highlightMeniscus={isDispensing || isScanning}
+              isDarkAnalysisMode={isDark}
+            />
 
-          {/* Micro Bubbles inside the liquid during active ink injection */}
-          <InkBubbles
-            active={isDispensing}
-            baseY={baseY}
-            meniscusY={inkTopY}
-            count={14}
-          />
-        </HeroRefillController>
+            {/* Micro Bubbles inside the liquid during active ink injection */}
+            <InkBubbles
+              active={isDispensing}
+              baseY={baseY}
+              meniscusY={inkTopY}
+              count={14}
+            />
+          </HeroRefillController>
+        </Suspense>
       </Canvas>
     </SceneErrorBoundary>
   );

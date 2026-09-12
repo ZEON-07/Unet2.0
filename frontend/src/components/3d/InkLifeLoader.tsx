@@ -2,11 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Canvas } from "@react-three/fiber";
-import { RefillModel } from "./RefillModel";
-import { InjectionNozzle } from "./InjectionNozzle";
-import { InkStream } from "./InkStream";
-import { InkBubbles } from "./InkBubbles";
+import { RefillFallback } from "@/components/three/RefillFallback";
 
 export interface InkLifeLoaderProps {
   onComplete: () => void;
@@ -168,55 +164,13 @@ export function InkLifeLoader({ onComplete, forcePlay = false }: InkLifeLoaderPr
 
           {/* ── Center 3D Stage with Technical Measurement Overlays ── */}
           <div className="relative flex-1 w-full flex items-center justify-center">
-            {/* Center Canvas */}
-            <div className="absolute inset-0 z-10">
-              <Canvas
-                camera={{ position: [0, 0, 5.8], fov: 40 }}
-                dpr={[1, 1.5]}
-                gl={{ antialias: true, alpha: true }}
-                style={{ width: "100%", height: "100%", background: "transparent" }}
-              >
-                <ambientLight intensity={1.1} />
-                <directionalLight position={[5, 8, 5]} intensity={1.4} color="#ffffff" />
-                <directionalLight position={[-4, -2, -3]} intensity={0.5} color="#94A3B8" />
-                <pointLight position={[0, 2, 2.5]} intensity={1.2} color="#225CFF" />
-
-                {/* Injection Nozzle */}
-                {nozzleProgress > 0.01 && (
-                  <group>
-                    <InjectionNozzle
-                      progress={nozzleProgress}
-                      dispensing={isDispensing}
-                    />
-                    <InkStream
-                      active={isDispensing}
-                      startY={2.20 * refillScale + refillOffsetY + 0.12}
-                      endY={worldMeniscusY}
-                      color="#225CFF"
-                    />
-                  </group>
-                )}
-
-                {/* Central Refill Model */}
-                <group
-                  position={[0, refillOffsetY, 0]}
-                  rotation={refillRotation}
-                  scale={refillScale}
-                >
-                  <RefillModel
-                    inkPercentage={inkLevel}
-                    interactiveSlider={false}
-                    highlightMeniscus={isDispensing}
-                    showSliderTooltip={false}
-                  />
-                  <InkBubbles
-                    active={isDispensing}
-                    baseY={localBaseY}
-                    meniscusY={localInkTopY}
-                    count={14}
-                  />
-                </group>
-              </Canvas>
+            {/* Center Stage with Blueprint Refill */}
+            <div className="relative z-10 flex items-center justify-center scale-110">
+              <RefillFallback
+                inkPercentage={inkLevel}
+                interactive={false}
+                isDarkAnalysisMode={false}
+              />
             </div>
 
             {/* Laser Height Scan Line (Visual element in Phase 1) */}
